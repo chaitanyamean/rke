@@ -25,11 +25,12 @@ connected"** when it succeeds.
 
 ## Ports
 
-| Service   | Container port | Host port |
-|-----------|----------------|-----------|
-| frontend  | 80             | **3001**  |
-| backend   | 8080           | **8000**  |
-| postgres  | 5432           | **5433**  |
+| Service        | Container port | Host port |
+|----------------|----------------|-----------|
+| frontend       | 80             | **3001**  |
+| backend        | 8080           | **8000**  |
+| postgres       | 5432           | **5433**  |
+| otel-collector | 4317 / 4318    | 4317 / 4318 |
 
 > The frontend is mapped to host port **3001** because **3000** is commonly
 > occupied by other local dev servers. Adjust the mappings in
@@ -53,6 +54,30 @@ Useful commands:
 make docker-logs            # follow logs from all services
 make docker-down            # stop and remove the services
 ```
+
+### Observability
+
+The stack ships with OpenTelemetry wired end to end. The backend is
+auto-instrumented by the OpenTelemetry Java agent (HTTP requests, JPA/Hibernate,
+Postgres queries) and sends traces/metrics/logs via OTLP to an `otel-collector`
+service, which prints them to its console for now.
+
+Hit the health endpoint and watch traces arrive:
+
+```bash
+curl http://localhost:8000/api/health
+docker compose logs -f otel-collector    # look for a "GET /api/health" span
+```
+
+Backend logs are structured JSON with `trace_id` / `span_id` on every line:
+
+```bash
+docker compose logs backend | grep trace_id | tail -1
+```
+
+See `ARCHITECTURE.md` for what is auto-instrumented vs. what needs manual spans,
+and how to point the collector at a real backend (Grafana/Tempo/Loki, Honeycomb,
+etc.) without touching application code.
 
 ## Manual start (per service)
 

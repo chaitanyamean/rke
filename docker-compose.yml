@@ -17,6 +17,16 @@ services:
       timeout: 5s
       retries: 10
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.155.0
+    container_name: rke-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+
   backend:
     build:
       context: ./backend
@@ -24,10 +34,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rke}
       DB_USERNAME: ${DB_USERNAME:-rke}
       DB_PASSWORD: ${DB_PASSWORD:-rke}
+      # ---- OpenTelemetry (read natively by the Java agent) ----
+      OTEL_SERVICE_NAME: rk-enterprises-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      # Export traces, metrics and logs via OTLP to the collector.
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
     ports:
       - "8000:8080"
 

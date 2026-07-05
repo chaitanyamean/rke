@@ -1,0 +1,50 @@
+# OpenTelemetry Collector configuration.
+#
+# For now this simply receives OTLP traces/metrics/logs from the backend and
+# prints them to the collector's own console via the `debug` exporter. No
+# external observability backend is wired up yet.
+#
+# To ship telemetry to a real backend later (Grafana Cloud / Tempo / Loki,
+# Honeycomb, self-hosted, ...), add an exporter under `exporters:` and reference
+# it in the relevant pipeline's `exporters:` list. The application never changes
+# — it always talks OTLP to this collector.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  # Prints received telemetry to stdout. `detailed` shows full span/attribute data.
+  debug:
+    verbosity: detailed
+
+  # ---- Example: swap in a real backend later (leave commented for now) ----
+  # otlphttp/grafana:
+  #   endpoint: https://otlp-gateway-prod.grafana.net/otlp
+  #   headers:
+  #     authorization: "Basic ${env:GRAFANA_CLOUD_TOKEN}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info

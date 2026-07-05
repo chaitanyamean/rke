@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+      Structured JSON logging to the console.
+
+      The OpenTelemetry Java agent injects `trace_id`, `span_id` and `trace_flags`
+      into SLF4J's MDC for every log statement emitted inside an active span. The
+      LogstashEncoder includes all MDC entries as top-level JSON fields by default,
+      so every log line can be correlated back to the exact request/trace that
+      produced it. This is what lets us later trace a suspicious farmer-ledger entry
+      back to the sale/payment/return request that wrote it.
+    -->
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="rke-backend"/>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Include all MDC keys (trace_id, span_id, trace_flags, ...) as JSON fields. -->
+            <includeMdc>true</includeMdc>
+            <includeContext>false</includeContext>
+            <customFields>{"service":"${appName}"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON"/>
+    </root>
+</configuration>
