@@ -163,16 +163,174 @@ point.
 
 ## Configuration & secrets
 
-- Root `.env.example` documents the database variables; `.env` is git-ignored.
+- Root `.env.example` documents all environment variables; `.env` is git-ignored.
 - The frontend's build-time variable lives in `frontend/.env.example`.
 - Compose provides sensible defaults so `make docker-up` works with zero
   manual configuration for local development.
-
-## Notes / future work
-
-- No domain/business logic yet — this is scaffolding only.
-- JPA `ddl-auto` is set to `none`; schema changes should go through Flyway
-  migrations rather than Hibernate auto-DDL.
 - For production, secrets should come from a secret manager rather than `.env`,
   and the frontend API URL should be provided at build/deploy time per
   environment.
+
+---
+
+## Multi-tenancy & isolation
+
+### How tenant isolation is enforced
+
+Three layers work together, each catching what the previous might miss:
+
+1. **Hibernate tenant filter (primary guard)** — A `@FilterDef` in
+   `domain/package-info.java` declares a named filter
+   (`tenantFilter : tenant_id = :tenantId`). Every tenant-scoped JPA entity
+   carries `@Filter(name = "tenantFilter")`. `TenantFilterAspect` activates the
+   filter before any repository call by reading the current `TenantContext`
+   (a per-request `ThreadLocal`). With the filter active, every SELECT Hibernate
+   generates silently appends `AND tenant_id = ?`, so cross-tenant data leaks via
+   accidental queries are structurally prevented.
+
+2. **Service-level ownership checks (secondary guard)** — `findById` bypasses
+   the Hibernate filter (it goes straight to a PK lookup). Every service method
+   that calls `findById` manually verifies that the result's `tenant_id` matches
+   the session tenant and throws `NotFoundException` otherwise (e.g.
+   `VillageService.get()`, `FarmerService.get()`).
+
+3. **`TenantScopeInterceptor` (HTTP-layer defence in depth)** — A Spring
+   `HandlerInterceptor` registered on all `/api/**` paths (excluding auth and
+   health). It enforces two rules before any handler is invoked:
+   - `/api/admin/**` is rejected for any non-super_admin role (belt-and-suspenders
+     on top of `@PreAuthorize`).
+   - Any other path where `TenantContext.getTenantId()` is null (i.e. a
+     super_admin without an active impersonation session trying to hit
+     tenant-scoped endpoints) is rejected with 403 and a helpful message.
+
+### Tenant context flow per request
+
+```
+Session cookie
+  → Spring Security restores SecurityContext (StaffUserPrincipal)
+    → TenantContextFilter (OncePerRequestFilter)
+        - regular user    → TenantContext.setTenantId(principal.tenantId)
+        - super_admin
+            with session[IMPERSONATED_TENANT_ID] → setTenantId(impersonated)
+            without                              → TenantContext stays null
+      → TenantScopeInterceptor validates access
+        → Controller → @Transactional Service
+          → TenantFilterAspect activates Hibernate filter
+            → Repository query with implicit tenant_id filter
+```
+
+---
+
+## Tenant onboarding (end-to-end)
+
+1. Super_admin logs in (username `superadmin`, no tenant slug needed).
+2. Navigate to **⚙ Tenants → New Tenant**.
+3. Fill name, slug (auto-generated), primary color, active toggle.
+4. Optionally upload a logo (requires S3 credentials configured — see
+   `S3_*` env vars in `.env.example`).
+5. On save: a new row is inserted into `tenants`. No migration needed.
+6. Add staff users for the new tenant (future: staff management UI; currently
+   via direct DB insert with a bcrypt-hashed password or a seed migration).
+7. Enable features via **Tenants → Features** toggle panel.
+
+---
+
+## Feature flags
+
+### How a feature is gated
+
+**Backend guard (`@RequiresFeature`):**
+```java
+@GetMapping("/api/cotton-lots")
+@RequiresFeature("cotton_procurement")   // ← annotation on controller method
+public List<CottonLot> list() { ... }
+```
+`FeatureGuardAspect` fires before the method, reads `TenantContext.getTenantId()`,
+queries `tenant_features` (via `TenantFeatureService.isEnabled()`), and throws
+403 if absent or disabled. Super_admin without impersonation bypasses this check.
+
+**Frontend guard (UI visibility):**
+```tsx
+const { hasFeature } = useAuth()
+{hasFeature('cotton_procurement') && <NavLink to="/cotton">Cotton</NavLink>}
+```
+`AuthContext` fetches `GET /api/features/mine` on login and page load, storing
+the enabled key list in React state. `hasFeature(key)` is a simple
+`Array.includes` check. The backend 403 is still the authoritative enforcement —
+hiding the UI is defence in depth only.
+
+### Adding a new feature key
+
+1. No schema change needed — the `tenant_features` table stores arbitrary strings.
+2. Add the entry to `KNOWN_FEATURES` in `TenantFeaturesPage.tsx` (label +
+   description) so it appears in the super_admin toggle panel.
+3. Annotate the backend endpoint(s) with `@RequiresFeature("your_key")`.
+4. Add `{hasFeature('your_key') && ...}` in `Layout.tsx` nav and any route guards.
+
+---
+
+## Tenant branding (runtime theming)
+
+The frontend uses a single static build that adapts to each tenant's branding
+at runtime via CSS custom properties — no per-tenant build step required.
+
+**Flow:**
+1. After login, `AuthContext` fetches `GET /api/tenants/current` which returns
+   the authenticated user's tenant (logo URL, primary color).
+2. `applyBranding()` sets `document.documentElement.style.setProperty('--color-brand', color)`.
+3. The Layout header uses `style={{ backgroundColor: 'var(--color-brand)' }}`.
+4. Tailwind is extended with `colors: { brand: 'var(--color-brand)' }` so
+   utility classes like `bg-brand` and `text-brand` reference the same variable.
+5. The logo `<img>` in the header renders when `tenant.logoUrl` is set.
+
+For a super_admin without impersonation, the default slate-800 color is applied.
+
+---
+
+## Super admin impersonation
+
+Super_admin can "impersonate" a tenant to access and administer its data:
+
+```
+POST /api/admin/tenants/{id}/impersonate
+```
+
+This sets `session[IMPERSONATED_TENANT_ID] = tenantId` and logs the event to
+`audit_log` (target tenant's context, action `update`, table `tenant_impersonation`).
+Subsequent requests from that session behave exactly as if a tenant admin logged
+in — the Hibernate filter is activated, all writes are scoped to that tenant.
+
+```
+DELETE /api/admin/impersonate
+```
+
+Clears the session attribute and logs an exit event.
+
+The frontend shows an amber banner on the Tenant List page when impersonation is
+active, with an "Exit impersonation" button.
+
+---
+
+## Object storage (logo uploads)
+
+Logo files are uploaded to any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO).
+Configure via environment variables:
+
+| Variable            | Description                                         |
+|---------------------|-----------------------------------------------------|
+| `S3_ENDPOINT`       | Custom endpoint URL (blank = use AWS default)       |
+| `S3_REGION`         | AWS region (default: `us-east-1`)                   |
+| `S3_ACCESS_KEY`     | Access key ID                                       |
+| `S3_SECRET_KEY`     | Secret access key                                   |
+| `S3_BUCKET`         | Bucket name (default: `rke-assets`)                 |
+| `S3_PUBLIC_URL_BASE`| Base URL prepended to the object key for the public logo URL |
+
+When `S3_ACCESS_KEY` is blank, the logo upload endpoint returns 501. The rest of
+the application works normally.
+
+## Notes
+
+- JPA `ddl-auto` is set to `none`; schema changes go through Flyway migrations.
+- The `next_bill_number(tenant_id, category_id)` Postgres function atomically
+  increments the per-tenant sequence and returns a formatted bill number. It will
+  be called from `TransactionService` in Phase 3.
