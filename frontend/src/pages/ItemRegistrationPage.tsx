@@ -1,0 +1,79 @@
+import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useItemCategories } from '../api/itemCategories'
+import { useCreateItem } from '../api/items'
+import { getErrorMessage } from '../lib/api'
+
+export default function ItemRegistrationPage() {
+  const { data: categories = [] } = useItemCategories()
+  const create = useCreateItem()
+  const navigate = useNavigate()
+
+  const [itemCategoryId, setItemCategoryId] = useState('')
+  const [name, setName] = useState('')
+  const [creditPrice, setCreditPrice] = useState('')
+  const [cashPrice, setCashPrice] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (!itemCategoryId) {
+      setError('Item category is required')
+      return
+    }
+    try {
+      await create.mutateAsync({
+        itemCategoryId,
+        name,
+        creditPrice: Number(creditPrice),
+        cashPrice: Number(cashPrice),
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <h1 className="text-2xl font-bold text-slate-800">Item Registration</h1>
+
+      <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Item Category *</span>
+            <select value={itemCategoryId} onChange={(e) => setItemCategoryId(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+              <option value="">Select category…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Item Name *</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Credit Price *</span>
+            <input type="number" min="0.01" step="0.01" value={creditPrice} onChange={(e) => setCreditPrice(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Cash Price *</span>
+            <input type="number" min="0.01" step="0.01" value={cashPrice} onChange={(e) => setCashPrice(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+          </label>
+        </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={create.isPending}
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+        >
+          {create.isPending ? 'Saving…' : 'Add item'}
+        </button>
+      </form>
+    </div>
+  )
+}

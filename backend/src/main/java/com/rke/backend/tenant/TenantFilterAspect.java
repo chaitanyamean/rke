@@ -25,8 +25,10 @@ import jakarta.persistence.PersistenceContext;
  * {@code super_admin} working across tenants) the filter is left off, so those
  * flows can query across tenants deliberately.
  *
- * <p>Runs within the active transaction/session opened by {@code @Transactional},
- * so unwrapping the shared {@link EntityManager} yields the current {@link Session}.
+ * <p>Targets the repository layer. Because our services are {@code @Transactional},
+ * any repository call already runs inside the service's open transaction, so
+ * unwrapping the shared {@link EntityManager} yields the current transactional
+ * {@link Session} and the filter applies to the query that follows.
  */
 @Aspect
 @Component
@@ -35,8 +37,7 @@ public class TenantFilterAspect {
     @PersistenceContext
     private EntityManager entityManager;
 
-    @Before("execution(* com.rke.backend..repository..*(..)) "
-            + "|| execution(* com.rke.backend..service..*(..))")
+    @Before("execution(* com.rke.backend..repository..*(..))")
     public void enableTenantFilter() {
         UUID tenantId = TenantContext.getTenantId();
         if (tenantId == null) {
