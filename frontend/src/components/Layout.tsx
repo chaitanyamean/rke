@@ -19,7 +19,7 @@ export default function Layout() {
     navigate('/login', { replace: true })
   }
 
-  const tenantName = tenant?.name ?? 'RK Enterprises'
+  const tenantName = tenant?.name ?? ''
   const logoUrl = tenant?.logoUrl ?? null
 
   return (

@@ -25,7 +25,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-console.log("Auth",AuthContext)
+
 const DEFAULT_BRAND_COLOR = '#1e293b' // slate-800
 
 function applyBranding(tenant: Tenant | null) {
@@ -133,20 +133,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [enabledFeatures],
   )
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const value = useMemo<AuthContextValue>(() => {
+    // The API returns the role from a Java enum, i.e. uppercase ("ADMIN"),
+    // while our TS type uses lowercase. Normalize before comparing.
+    const role = user?.role?.toLowerCase()
+    return {
       user,
       tenant,
       loading,
-      isAdmin: user?.role === 'admin' || user?.role === 'super_admin',
-      isSuperAdmin: user?.role === 'super_admin',
+      isAdmin: role === 'admin' || role === 'super_admin',
+      isSuperAdmin: role === 'super_admin',
       enabledFeatures,
       hasFeature,
       login,
       logout,
-    }),
-    [user, tenant, loading, enabledFeatures, hasFeature, login, logout],
-  )
+    }
+  }, [user, tenant, loading, enabledFeatures, hasFeature, login, logout])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
