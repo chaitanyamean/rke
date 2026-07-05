@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rke-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rke}
+      POSTGRES_USER: ${DB_USERNAME:-rke}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rke}
+    ports:
+      # Host 5433 -> container 5432 (avoids clashing with a local postgres on 5432)
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-rke} -d ${POSTGRES_DB:-rke}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: rke-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rke}
+      DB_USERNAME: ${DB_USERNAME:-rke}
+      DB_PASSWORD: ${DB_PASSWORD:-rke}
+    ports:
+      - "8000:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the static bundle; the browser reaches the backend on the host port.
+        VITE_API_BASE_URL: http://localhost:8000
+    container_name: rke-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3001:80"
+
+volumes:
+  postgres_data:
