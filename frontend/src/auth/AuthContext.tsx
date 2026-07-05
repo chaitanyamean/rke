@@ -25,7 +25,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-
+console.log("Auth",AuthContext)
 const DEFAULT_BRAND_COLOR = '#1e293b' // slate-800
 
 function applyBranding(tenant: Tenant | null) {

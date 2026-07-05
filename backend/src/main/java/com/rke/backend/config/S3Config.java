@@ -2,7 +2,7 @@ package com.rke.backend.config;
 
 import java.net.URI;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,7 +23,11 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 public class S3Config {
 
     @Bean
-    @ConditionalOnProperty(prefix = "storage.s3", name = "access-key", matchIfMissing = false)
+    // Only create the S3 client when a non-empty access key is configured.
+    // application.yml resolves the key to an empty string when the env var is
+    // absent (local dev), so a plain @ConditionalOnProperty would still match
+    // and fail on the blank key — hence the explicit non-empty check here.
+    @ConditionalOnExpression("'${storage.s3.access-key:}' != ''")
     public S3Client s3Client(StorageProperties props) {
         S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(props.getRegion()))

@@ -1,5 +1,5 @@
 -- =============================================================================
--- V4 — Seed a platform super_admin login (cross-tenant, not scoped to any tenant).
+-- V7 — Seed a platform super_admin login (cross-tenant, not scoped to any tenant).
 --
 --   username : superadmin
 --   password : superadmin123
