@@ -61,4 +61,15 @@ public class Transaction extends FinancialEntity {
     // Persisted as lowercase token via TransactionStatusConverter (autoApply).
     @Column(name = "status", nullable = false)
     private TransactionStatus status;
+
+    /**
+     * Set only on RETURN rows. Points back to the bill_number of the CASH_SALE or
+     * CREDIT_SALE being reversed. NULL for all other transaction types.
+     *
+     * <p>Phase 7 reports: sum transaction_items.amount directly (returns already
+     * carry negative amounts), then filter or group by original_bill_number to
+     * build return-detail views — no separate is_return flag needed.
+     */
+    @Column(name = "original_bill_number")
+    private String originalBillNumber;
 }

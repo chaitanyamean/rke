@@ -3,13 +3,15 @@ import { useAuth } from '../auth/AuthContext'
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return [
-    'px-3 py-2 rounded-md text-sm font-medium',
-    isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200',
+    'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+    isActive
+      ? 'bg-white/20 text-white'
+      : 'text-white/75 hover:bg-white/10 hover:text-white',
   ].join(' ')
 }
 
 export default function Layout() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, tenant, isAdmin, isSuperAdmin, hasFeature, logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -17,11 +19,30 @@ export default function Layout() {
     navigate('/login', { replace: true })
   }
 
+  const tenantName = tenant?.name ?? 'RK Enterprises'
+  const logoUrl = tenant?.logoUrl ?? null
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+      {/* Header — background driven by CSS variable set at runtime from tenant branding */}
+      <header
+        className="border-b border-black/10"
+        style={{ backgroundColor: 'var(--color-brand, #1e293b)' }}
+      >
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
-          <span className="mr-4 text-lg font-bold text-slate-800">RK Enterprises</span>
+          {/* Logo / tenant name */}
+          <div className="mr-4 flex items-center gap-2">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={tenantName}
+                className="h-7 w-auto rounded object-contain"
+              />
+            ) : null}
+            <span className="text-lg font-bold text-white">{tenantName}</span>
+          </div>
+
+          {/* Navigation */}
           <nav className="flex flex-wrap items-center gap-1">
             <NavLink to="/" end className={navClass}>
               Dashboard
@@ -32,6 +53,30 @@ export default function Layout() {
             <NavLink to="/items" className={navClass}>
               Items
             </NavLink>
+            <NavLink to="/sales/cash" className={navClass}>
+              Cash Sale
+            </NavLink>
+            <NavLink to="/sales/credit" className={navClass}>
+              Credit Sale
+            </NavLink>
+            <NavLink to="/payments/payment" className={navClass}>
+              Payment
+            </NavLink>
+            <NavLink to="/payments/receipt" className={navClass}>
+              Receipt
+            </NavLink>
+            <NavLink to="/returns" className={navClass}>
+              Returns
+            </NavLink>
+
+            {/* Feature-gated: Cotton Procurement */}
+            {hasFeature('cotton_procurement') && (
+              <NavLink to="/cotton" className={navClass}>
+                Cotton
+              </NavLink>
+            )}
+
+            {/* Admin-only: master data */}
             {isAdmin && (
               <>
                 <NavLink to="/villages" className={navClass}>
@@ -45,23 +90,33 @@ export default function Layout() {
                 </NavLink>
               </>
             )}
+
+            {/* Super admin only: tenant management */}
+            {isSuperAdmin && (
+              <NavLink to="/admin/tenants" className={navClass}>
+                ⚙ Tenants
+              </NavLink>
+            )}
           </nav>
+
+          {/* User info + logout */}
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="text-slate-500">
+            <span className="text-white/80">
               {user?.fullName || user?.username}
-              <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs uppercase text-slate-500">
+              <span className="ml-1 rounded bg-white/20 px-1.5 py-0.5 text-xs uppercase text-white">
                 {user?.role}
               </span>
             </span>
             <button
               onClick={handleLogout}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-600 hover:bg-slate-100"
+              className="rounded-md border border-white/30 px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white"
             >
               Logout
             </button>
           </div>
         </div>
       </header>
+
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

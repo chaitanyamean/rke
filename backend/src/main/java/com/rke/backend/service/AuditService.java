@@ -52,8 +52,21 @@ public class AuditService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(String tableName, UUID recordId, AuditAction action,
                        Map<String, Object> oldValues, Map<String, Object> newValues) {
+        recordForTenant(currentUserService.getTenantId(), tableName, recordId, action,
+                oldValues, newValues);
+    }
+
+    /**
+     * Writes an audit row with an explicitly supplied {@code tenantId}.
+     * Used by super_admin operations (tenant updates, impersonation events) where
+     * the target tenant differs from — or doesn't exist in — {@code TenantContext}.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordForTenant(UUID tenantId, String tableName, UUID recordId,
+                                AuditAction action,
+                                Map<String, Object> oldValues, Map<String, Object> newValues) {
         AuditLog log = AuditLog.builder()
-                .tenantId(currentUserService.getTenantId())
+                .tenantId(tenantId)
                 .tableName(tableName)
                 .recordId(recordId)
                 .action(action)

@@ -12,9 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+
 import com.rke.backend.domain.Farmer;
 import com.rke.backend.dto.FarmerRequest;
 import com.rke.backend.service.FarmerService;
+import com.rke.backend.service.PaymentService;
 
 import jakarta.validation.Valid;
 
@@ -27,9 +30,11 @@ import jakarta.validation.Valid;
 public class FarmerController {
 
     private final FarmerService service;
+    private final PaymentService paymentService;
 
-    public FarmerController(FarmerService service) {
+    public FarmerController(FarmerService service, PaymentService paymentService) {
         this.service = service;
+        this.paymentService = paymentService;
     }
 
     @GetMapping
@@ -52,5 +57,15 @@ public class FarmerController {
     @PutMapping("/{id}")
     public Farmer update(@PathVariable UUID id, @Valid @RequestBody FarmerRequest request) {
         return service.update(id, request);
+    }
+
+    /**
+     * Returns the outstanding balance for the farmer computed live from the
+     * transaction log (credit_sales minus cash_payments and cash_receipts,
+     * excluding voided transactions). Positive value = farmer owes money.
+     */
+    @GetMapping("/{id}/balance")
+    public BigDecimal balance(@PathVariable UUID id) {
+        return paymentService.getOutstandingBalance(id);
     }
 }

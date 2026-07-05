@@ -7,6 +7,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import com.rke.backend.tenant.TenantContext;
+
 /**
  * Convenience accessor for the currently authenticated {@link StaffUserPrincipal}.
  * Used by services to stamp {@code audit_log.changed_by} and to resolve the
@@ -34,8 +36,17 @@ public class CurrentUserService {
         return requirePrincipal().getUserId();
     }
 
-    /** Current tenant id (null for a super_admin acting cross-tenant). */
+    /**
+     * Returns the effective tenant id for the current request.
+     *
+     * <p>For regular tenant users this equals their {@code staff_users.tenant_id}.
+     * For a super_admin with an active impersonation session it returns the
+     * impersonated tenant id (set by {@link TenantContextFilter}). For a
+     * super_admin without impersonation it returns {@code null} (cross-tenant
+     * access; Hibernate filter disabled).
+     */
     public UUID getTenantId() {
-        return currentPrincipal().map(StaffUserPrincipal::getTenantId).orElse(null);
+        // TenantContextFilter sets this ThreadLocal for every request.
+        return TenantContext.getTenantId();
     }
 }

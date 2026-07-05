@@ -73,6 +73,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/health", "/actuator/health").permitAll()
+                        // /api/tenants/current is behind authentication (not public) but
+                        // excluded from the TenantScopeInterceptor so super_admin can call it.
                         .anyRequest().authenticated())
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))

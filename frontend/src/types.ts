@@ -8,6 +8,24 @@ export interface User {
   role: StaffRole
 }
 
+export interface Tenant {
+  id: string
+  name: string
+  slug: string
+  logoUrl: string | null
+  primaryColor: string | null
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TenantFeature {
+  id: string
+  tenantId: string
+  featureKey: string
+  enabled: boolean
+}
+
 export interface Village {
   id: string
   tenantId: string
@@ -58,4 +76,30 @@ export interface Item {
   cashPrice: number
   createdAt: string
   updatedAt: string
+}
+
+export type TransactionType = 'CASH_SALE' | 'CREDIT_SALE' | 'CASH_PAYMENT' | 'CASH_RECEIPT' | 'RETURN'
+export type TransactionStatus = 'ACTIVE' | 'VOIDED'
+
+export interface TransactionItem {
+  id: string
+  itemId: string
+  quantity: number
+  price: number
+  amount: number
+}
+
+export interface Transaction {
+  id: string
+  farmerId: string
+  billNumber: string
+  /** Non-null only for RETURN transactions. */
+  originalBillNumber: string | null
+  billNumberTypeId: string
+  transactionType: TransactionType
+  transactionDate: string
+  grandTotal: number
+  remarks: string | null
+  status: TransactionStatus
+  items: TransactionItem[]
 }

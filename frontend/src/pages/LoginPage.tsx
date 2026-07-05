@@ -8,6 +8,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [tenantSlug, setTenantSlug] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
     setError(null)
     setSubmitting(true)
     try {
-      await login(username, password)
+      await login(username, password, tenantSlug || undefined)
       navigate('/', { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Invalid username or password'))
@@ -54,13 +55,26 @@ export default function LoginPage() {
           />
         </label>
 
-        <label className="mb-6 block">
+        <label className="mb-4 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Password</span>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2"
+          />
+        </label>
+
+        <label className="mb-6 block">
+          <span className="mb-1 block text-sm font-medium text-slate-700">
+            Tenant slug
+            <span className="ml-1 text-xs font-normal text-slate-400">(optional — only needed if your username exists in multiple tenants)</span>
+          </span>
+          <input
+            value={tenantSlug}
+            onChange={(e) => setTenantSlug(e.target.value)}
+            placeholder="e.g. rk-enterprises"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
           />
         </label>
 

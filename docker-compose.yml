@@ -44,10 +44,18 @@ services:
       OTEL_SERVICE_NAME: rk-enterprises-backend
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-      # Export traces, metrics and logs via OTLP to the collector.
       OTEL_TRACES_EXPORTER: otlp
       OTEL_METRICS_EXPORTER: otlp
       OTEL_LOGS_EXPORTER: otlp
+      # ---- S3 storage (logo uploads) — override via .env ----
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-rke-assets}
+      S3_PUBLIC_URL_BASE: ${S3_PUBLIC_URL_BASE:-}
+      # ---- CORS ----
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
     ports:
       - "8000:8080"
 
