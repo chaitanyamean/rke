@@ -68,6 +68,9 @@ export default function Layout() {
             <NavLink to="/returns" className={navClass}>
               Returns
             </NavLink>
+            <NavLink to="/reports" className={navClass}>
+              Reports
+            </NavLink>
 
             {/* Feature-gated: Cotton Procurement */}
             {hasFeature('cotton_procurement') && (

@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: rke
+    orgId: 1
+    folder: RKE
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

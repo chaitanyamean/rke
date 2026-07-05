@@ -1,0 +1,104 @@
+# =============================================================================
+# Render Blueprint — RK Enterprises monorepo
+#
+# Defines all three infrastructure pieces from this single repo:
+#   rke-postgres   — managed Postgres 16
+#   rke-backend    — Spring Boot Docker service
+#   rke-frontend   — React/Nginx Docker service
+#
+# Usage:
+#   render blueprint launch   (CLI)
+#   or connect this repo in the Render dashboard → "Blueprint"
+#
+# After first deploy, complete the two manual steps in DEPLOYMENT.md:
+#   1. Set CORS_ALLOWED_ORIGINS on rke-backend to the frontend URL.
+#   2. Set VITE_API_BASE_URL on rke-frontend to the backend URL,
+#      then trigger a manual redeploy of the frontend.
+# =============================================================================
+
+databases:
+  - name: rke-postgres
+    plan: starter          # upgrade to standard for production
+    databaseName: rke
+    user: rke
+    postgresMajorVersion: 16
+
+services:
+  # ── Backend ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: rke-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /api/health
+    # Render polls /api/health; the endpoint returns 503 if the DB is unreachable,
+    # so traffic is only routed once Flyway migrations have completed.
+    envVars:
+      # ── Database (wired from the managed Postgres above) ──
+      - key: DB_HOST
+        fromDatabase:
+          name: rke-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: rke-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: rke-postgres
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: rke-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: rke-postgres
+          property: password
+
+      # ── CORS — set to the frontend's Render URL after first deploy ──
+      # Example: https://rke-frontend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false   # fill in Render dashboard after frontend is deployed
+
+      # ── S3-compatible storage (Backblaze B2 or AWS S3) ──
+      # Leave blank to disable logo upload; set all four to enable.
+      - key: S3_ENDPOINT
+        sync: false   # e.g. https://s3.us-west-004.backblazeb2.com
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: rke-assets
+      - key: S3_PUBLIC_URL_BASE
+        sync: false   # e.g. https://f004.backblazeb2.com/file/rke-assets
+
+      # ── OpenTelemetry — disabled by default on Render (no local collector) ──
+      # Remove these two lines and add OTEL_EXPORTER_OTLP_ENDPOINT to re-enable.
+      - key: OTEL_TRACES_EXPORTER
+        value: none
+      - key: OTEL_METRICS_EXPORTER
+        value: none
+      - key: OTEL_LOGS_EXPORTER
+        value: none
+
+  # ── Frontend ────────────────────────────────────────────────────────────────
+  - type: web
+    name: rke-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: starter
+    # VITE_API_BASE_URL is baked into the static bundle at Docker build time
+    # (see frontend/Dockerfile ARG). Render passes env vars as Docker build args,
+    # so setting it here causes the next build to pick it up automatically.
+    #
+    # Set this to https://rke-backend.onrender.com (or your custom domain)
+    # before triggering the frontend build — see DEPLOYMENT.md step 3.
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false   # fill in Render dashboard: https://<rke-backend>.onrender.com

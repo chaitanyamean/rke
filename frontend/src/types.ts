@@ -78,6 +78,27 @@ export interface Item {
   updatedAt: string
 }
 
+export interface CottonLotEntry {
+  id: string
+  farmerId: string
+  villageId: string
+  quantity: number
+  price: number
+  amount: number
+}
+
+export interface CottonLot {
+  id: string
+  vehicleSerialNumber: string
+  vehicleRegistrationNumber: string | null
+  mutaHamaliName: string | null
+  commonPrice: number
+  totalQuantity: number
+  totalAmount: number
+  lotDate: string
+  entries: CottonLotEntry[]
+}
+
 export type TransactionType = 'CASH_SALE' | 'CREDIT_SALE' | 'CASH_PAYMENT' | 'CASH_RECEIPT' | 'RETURN'
 export type TransactionStatus = 'ACTIVE' | 'VOIDED'
 

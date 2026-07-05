@@ -16,6 +16,13 @@ import TenantFeaturesPage from './pages/admin/TenantFeaturesPage'
 import SalePage from './pages/SalePage'
 import PaymentPage from './pages/PaymentPage'
 import ReturnPage from './pages/ReturnPage'
+import CottonLotPage from './pages/CottonLotPage'
+import ReportsLandingPage from './pages/reports/ReportsLandingPage'
+import FarmerLedgerPage from './pages/reports/FarmerLedgerPage'
+import VillageOutstandingsPage from './pages/reports/VillageOutstandingsPage'
+import ItemSalesPage from './pages/reports/ItemSalesPage'
+import DateSalesPage from './pages/reports/DateSalesPage'
+import DatePaymentsPage from './pages/reports/DatePaymentsPage'
 
 export default function App() {
   return (
@@ -36,6 +43,13 @@ export default function App() {
           <Route path="/payments/payment" element={<PaymentPage direction="payment" />} />
           <Route path="/payments/receipt" element={<PaymentPage direction="receipt" />} />
           <Route path="/returns" element={<ReturnPage />} />
+          <Route path="/cotton" element={<CottonLotPage />} />
+          <Route path="/reports" element={<ReportsLandingPage />} />
+          <Route path="/reports/ledger" element={<FarmerLedgerPage />} />
+          <Route path="/reports/village-outstandings" element={<VillageOutstandingsPage />} />
+          <Route path="/reports/item-sales" element={<ItemSalesPage />} />
+          <Route path="/reports/date-sales" element={<DateSalesPage />} />
+          <Route path="/reports/date-payments" element={<DatePaymentsPage />} />
 
           {/* Admin-only */}
           <Route element={<AdminRoute />}>

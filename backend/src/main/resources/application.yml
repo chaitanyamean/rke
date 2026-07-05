@@ -6,7 +6,10 @@ spring:
     name: rke-backend
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/rke}
+    # DATABASE_URL takes full precedence (Docker Compose sets it as a JDBC URL).
+    # On Render, individual DB_* vars are injected via fromDatabase; the JDBC URL
+    # is assembled from them. DB_HOST/PORT/NAME are ignored when DATABASE_URL is set.
+    url: ${DATABASE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:rke}}
     username: ${DB_USERNAME:rke}
     password: ${DB_PASSWORD:rke}
     driver-class-name: org.postgresql.Driver
