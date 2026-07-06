@@ -325,10 +325,10 @@ export default function SaleForm({ saleType }: Props) {
                   setBillNumber(e.target.value)
                   setBillNumberAuto(false)
                 }}
-                placeholder="Auto-generated or enter manually"
+                placeholder="Bill Number"
                 className="flex-1 rounded-md border border-slate-300 px-3 py-2"
               />
-              <button
+              {/* <button
                 type="button"
                 onClick={() => {
                   setBillNumberAuto(true)
@@ -340,7 +340,7 @@ export default function SaleForm({ saleType }: Props) {
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
               >
                 Auto
-              </button>
+              </button> */}
             </div>
           </label>
         </div>
@@ -439,7 +439,7 @@ interface LineRowProps {
 
 function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange, onRemove }: LineRowProps) {
   const amount = (parseFloat(line.quantity) || 0) * (parseFloat(line.price) || 0)
-
+  console.log("Items", items);
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="flex-1 min-w-[160px]">

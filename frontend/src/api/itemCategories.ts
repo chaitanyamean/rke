@@ -15,6 +15,7 @@ export function useItemCategories(search?: string) {
     queryFn: async () =>
       (await api.get<ItemCategory[]>('/api/item-categories', { params: search ? { search } : {} }))
         .data,
+    refetchOnWindowFocus: true,
   })
 }
 

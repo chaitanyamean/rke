@@ -16,6 +16,7 @@ export function useItems() {
   return useQuery({
     queryKey: KEY,
     queryFn: async () => (await api.get<Item[]>('/api/items')).data,
+    refetchOnWindowFocus: true,
   })
 }
 
