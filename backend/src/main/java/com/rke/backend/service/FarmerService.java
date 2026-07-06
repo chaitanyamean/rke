@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.rke.backend.domain.Farmer;
-import com.rke.backend.domain.Village;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.dto.FarmerRequest;
 import com.rke.backend.exception.NotFoundException;
@@ -83,9 +82,7 @@ public class FarmerService {
     }
 
     private void requireVillage(UUID villageId) {
-        Village village = villageRepository.findById(villageId).orElse(null);
-        if (village == null
-                || !Objects.equals(village.getTenantId(), currentUserService.getTenantId())) {
+        if (!villageRepository.existsById(villageId)) {
             throw new IllegalArgumentException("Village not found: " + villageId);
         }
     }

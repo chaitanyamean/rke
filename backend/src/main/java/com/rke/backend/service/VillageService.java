@@ -2,7 +2,6 @@ package com.rke.backend.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -13,20 +12,16 @@ import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.dto.VillageRequest;
 import com.rke.backend.exception.NotFoundException;
 import com.rke.backend.repository.VillageRepository;
-import com.rke.backend.security.CurrentUserService;
 
 @Service
 public class VillageService {
 
     private final VillageRepository repository;
     private final AuditService auditService;
-    private final CurrentUserService currentUserService;
 
-    public VillageService(VillageRepository repository, AuditService auditService,
-                          CurrentUserService currentUserService) {
+    public VillageService(VillageRepository repository, AuditService auditService) {
         this.repository = repository;
         this.auditService = auditService;
-        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
@@ -39,18 +34,12 @@ public class VillageService {
 
     @Transactional(readOnly = true)
     public Village get(UUID id) {
-        Village village = repository.findById(id).orElseThrow(() -> NotFoundException.of("Village", id));
-        // findById bypasses the Hibernate tenant filter, so verify ownership explicitly.
-        if (!Objects.equals(village.getTenantId(), currentUserService.getTenantId())) {
-            throw NotFoundException.of("Village", id);
-        }
-        return village;
+        return repository.findById(id).orElseThrow(() -> NotFoundException.of("Village", id));
     }
 
     @Transactional
     public Village create(VillageRequest request) {
         Village village = Village.builder()
-                .tenantId(currentUserService.getTenantId())
                 .name(request.name().trim())
                 .landmark(trimToNull(request.landmark()))
                 .build();

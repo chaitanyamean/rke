@@ -28,7 +28,6 @@ export interface TenantFeature {
 
 export interface Village {
   id: string
-  tenantId: string
   name: string
   landmark: string | null
   createdAt: string

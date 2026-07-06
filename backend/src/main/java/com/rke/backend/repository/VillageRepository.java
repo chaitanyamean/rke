@@ -7,10 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.rke.backend.domain.Village;
 
-/**
- * Village access. All queries are automatically scoped to the current tenant by
- * the Hibernate tenant filter (see TenantFilterAspect).
- */
+/** Village access. Villages are global master data, shared across all tenants. */
 public interface VillageRepository extends JpaRepository<Village, UUID> {
 
     List<Village> findByNameContainingIgnoreCaseOrderByNameAsc(String name);

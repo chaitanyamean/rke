@@ -5,5 +5,5 @@ interface Props {
 }
 
 export default function SalePage({ saleType }: Props) {
-  return <SaleForm saleType={saleType} />
+  return <SaleForm key={saleType} saleType={saleType} />
 }

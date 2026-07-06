@@ -3,7 +3,6 @@ package com.rke.backend.controller;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,8 +19,8 @@ import com.rke.backend.service.VillageService;
 import jakarta.validation.Valid;
 
 /**
- * Villages master data. Reads are open to any authenticated user; mutations are
- * admin-only.
+ * Villages master data, global across all tenants. Any authenticated user
+ * (staff, admin, or super_admin) can read, create, or update a village.
  */
 @RestController
 @RequestMapping("/api/villages")
@@ -44,13 +43,11 @@ public class VillageController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public Village create(@Valid @RequestBody VillageRequest request) {
         return service.create(request);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public Village update(@PathVariable UUID id, @Valid @RequestBody VillageRequest request) {
         return service.update(id, request);
     }

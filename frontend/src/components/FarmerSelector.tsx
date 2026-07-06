@@ -25,6 +25,8 @@ export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
     () => Array.from(new Set(farmers.map((f) => f.name))).sort((a, b) => a.localeCompare(b)),
     [farmers],
   )
+
+  console.log("Farmers:", names)
   const candidates = useMemo(
     () => farmers.filter((f) => f.name === name),
     [farmers, name],

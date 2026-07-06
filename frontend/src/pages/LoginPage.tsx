@@ -8,7 +8,6 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [tenantSlug, setTenantSlug] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -21,7 +20,7 @@ export default function LoginPage() {
     setError(null)
     setSubmitting(true)
     try {
-      await login(username, password, tenantSlug || undefined)
+      await login(username, password)
       navigate('/', { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Invalid username or password'))
