@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
 import com.rke.backend.dto.report.FarmerLedgerRow;
 import com.rke.backend.dto.report.ItemSalesRow;
+import com.rke.backend.dto.report.RecentTransactionRow;
 import com.rke.backend.dto.report.VillageOutstandingRow;
 import com.rke.backend.security.CurrentUserService;
 
@@ -290,8 +292,114 @@ public class ReportService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // 6. Dashboard summary — today's sales/receipts/payments + outstanding totals
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public DashboardSummary dashboardSummary() {
+        UUID tenantId = currentUserService.getTenantId();
+
+        // Today's cash/credit sales, cash received (receipts) and payments.
+        Query today = entityManager.createNativeQuery("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN transaction_type = 'cash_sale'    THEN grand_total END), 0),
+                    COALESCE(SUM(CASE WHEN transaction_type = 'credit_sale'  THEN grand_total END), 0),
+                    COALESCE(SUM(CASE WHEN transaction_type = 'cash_receipt' THEN grand_total END), 0),
+                    COALESCE(SUM(CASE WHEN transaction_type = 'cash_payment' THEN grand_total END), 0)
+                FROM transactions
+                WHERE tenant_id = :tenantId
+                  AND status = 'active'
+                  AND transaction_date = CURRENT_DATE
+                """);
+        today.setParameter("tenantId", tenantId);
+        Object[] t = (Object[]) today.getSingleResult();
+        BigDecimal cashSales = decimal(t[0]);
+        BigDecimal creditSales = decimal(t[1]);
+        BigDecimal cashReceived = decimal(t[2]);
+        BigDecimal payments = decimal(t[3]);
+
+        // Per-farmer outstanding balance, then aggregate total + counts.
+        Query outstanding = entityManager.createNativeQuery("""
+                SELECT
+                    COALESCE(SUM(bal), 0)                 AS total_outstanding,
+                    COUNT(*) FILTER (WHERE bal > 0)       AS customers_with_outstanding,
+                    COUNT(*)                              AS total_customers
+                FROM (
+                    SELECT f.id,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN t.transaction_type = 'credit_sale'                     THEN  t.grand_total
+                                WHEN t.transaction_type IN ('cash_payment','cash_receipt')  THEN -t.grand_total
+                                WHEN t.transaction_type = 'return'                          THEN -ABS(t.grand_total)
+                                ELSE 0
+                            END
+                        ), 0) AS bal
+                    FROM farmers f
+                    LEFT JOIN transactions t
+                           ON t.farmer_id = f.id
+                          AND t.tenant_id = :tenantId
+                          AND t.status    = 'active'
+                    WHERE f.tenant_id = :tenantId
+                    GROUP BY f.id
+                ) per_farmer
+                """);
+        outstanding.setParameter("tenantId", tenantId);
+        Object[] o = (Object[]) outstanding.getSingleResult();
+
+        return new DashboardSummary(
+                LocalDate.now().toString(),
+                cashSales,
+                creditSales,
+                cashSales.add(creditSales),
+                cashReceived,
+                payments,
+                decimal(o[0]),
+                longVal(o[1]),
+                longVal(o[2]));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 7. Recent transactions — latest activity across all farmers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<RecentTransactionRow> recentTransactions(int limit) {
+        UUID tenantId = currentUserService.getTenantId();
+
+        Query query = entityManager.createNativeQuery("""
+                SELECT
+                    t.transaction_date::text,
+                    t.transaction_type,
+                    t.bill_number,
+                    f.name,
+                    t.grand_total
+                FROM transactions t
+                JOIN farmers f ON f.id = t.farmer_id AND f.tenant_id = :tenantId
+                WHERE t.tenant_id = :tenantId
+                  AND t.status = 'active'
+                ORDER BY t.transaction_date DESC, t.created_at DESC
+                LIMIT :limit
+                """);
+        query.setParameter("tenantId", tenantId);
+        query.setParameter("limit", limit);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        return rows.stream().map(r -> new RecentTransactionRow(
+                str(r[0]), str(r[1]), str(r[2]), str(r[3]), decimal(r[4])
+        )).toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private static long longVal(Object o) {
+        if (o == null) return 0L;
+        if (o instanceof Number n) return n.longValue();
+        return Long.parseLong(o.toString());
+    }
 
     private static String str(Object o) {
         return o == null ? null : o.toString();

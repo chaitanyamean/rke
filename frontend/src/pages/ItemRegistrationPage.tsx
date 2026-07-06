@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useItemCategories } from '../api/itemCategories'
 import { useCreateItem } from '../api/items'
 import { getErrorMessage } from '../lib/api'
+import { ITEM_UNITS } from '../types'
 
 export default function ItemRegistrationPage() {
   const { data: categories = [] } = useItemCategories()
@@ -13,6 +14,7 @@ export default function ItemRegistrationPage() {
   const [name, setName] = useState('')
   const [creditPrice, setCreditPrice] = useState('')
   const [cashPrice, setCashPrice] = useState('')
+  const [unit, setUnit] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const onSubmit = async (e: FormEvent) => {
@@ -22,12 +24,17 @@ export default function ItemRegistrationPage() {
       setError('Item category is required')
       return
     }
+    if (!unit) {
+      setError('Unit is required')
+      return
+    }
     try {
       await create.mutateAsync({
         itemCategoryId,
         name,
         creditPrice: Number(creditPrice),
         cashPrice: Number(cashPrice),
+        unit,
       })
       navigate('/items')
     } catch (err) {
@@ -61,6 +68,15 @@ export default function ItemRegistrationPage() {
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Cash Price *</span>
             <input type="number" min="0.01" step="0.01" value={cashPrice} onChange={(e) => setCashPrice(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Unit *</span>
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+              <option value="">Select unit…</option>
+              {ITEM_UNITS.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
           </label>
         </div>
 

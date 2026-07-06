@@ -40,4 +40,7 @@ public class Item extends TenantScopedEntity {
 
     @Column(name = "cash_price", nullable = false)
     private BigDecimal cashPrice;
+
+    @Column(name = "unit", nullable = false)
+    private String unit;
 }

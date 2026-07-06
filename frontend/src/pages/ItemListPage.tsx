@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useItems, useUpdateItem } from '../api/items'
 import { useItemCategories } from '../api/itemCategories'
 import { getErrorMessage } from '../lib/api'
-import type { Item } from '../types'
+import { ITEM_UNITS, type Item } from '../types'
 
 export default function ItemListPage() {
   const { isAdmin } = useAuth()
@@ -13,7 +13,7 @@ export default function ItemListPage() {
   const update = useUpdateItem()
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ name: '', creditPrice: '', cashPrice: '' })
+  const [draft, setDraft] = useState({ name: '', creditPrice: '', cashPrice: '', unit: '' })
   const [error, setError] = useState<string | null>(null)
 
   const grouped = useMemo(() => {
@@ -32,6 +32,7 @@ export default function ItemListPage() {
       name: item.name,
       creditPrice: String(item.creditPrice),
       cashPrice: String(item.cashPrice),
+      unit: item.unit,
     })
     setError(null)
   }
@@ -46,6 +47,7 @@ export default function ItemListPage() {
           name: draft.name,
           creditPrice: Number(draft.creditPrice),
           cashPrice: Number(draft.cashPrice),
+          unit: draft.unit,
         },
       })
       setEditingId(null)
@@ -83,6 +85,7 @@ export default function ItemListPage() {
               <thead className="text-slate-500">
                 <tr>
                   <th className="px-4 py-2 font-medium">Item</th>
+                  <th className="px-4 py-2 font-medium">Unit</th>
                   <th className="px-4 py-2 font-medium">Credit Price</th>
                   <th className="px-4 py-2 font-medium">Cash Price</th>
                   {isAdmin && <th className="px-4 py-2" />}
@@ -102,6 +105,21 @@ export default function ItemListPage() {
                           />
                         ) : (
                           item.name
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-slate-600">
+                        {editing ? (
+                          <select
+                            value={draft.unit}
+                            onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))}
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1"
+                          >
+                            {ITEM_UNITS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          item.unit
                         )}
                       </td>
                       <td className="px-4 py-2 text-slate-600">

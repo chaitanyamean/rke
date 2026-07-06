@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
 import com.rke.backend.dto.report.FarmerLedgerRow;
 import com.rke.backend.dto.report.ItemSalesRow;
+import com.rke.backend.dto.report.RecentTransactionRow;
 import com.rke.backend.dto.report.VillageOutstandingRow;
 import com.rke.backend.service.ReportService;
 
@@ -26,6 +28,19 @@ public class ReportsController {
 
     public ReportsController(ReportService reportService) {
         this.reportService = reportService;
+    }
+
+    /** Aggregated figures for the dashboard landing page. */
+    @GetMapping("/dashboard")
+    public DashboardSummary dashboard() {
+        return reportService.dashboardSummary();
+    }
+
+    /** Latest transactions across all farmers (for the dashboard table). */
+    @GetMapping("/recent-transactions")
+    public List<RecentTransactionRow> recentTransactions(
+            @RequestParam(defaultValue = "10") int limit) {
+        return reportService.recentTransactions(Math.min(Math.max(limit, 1), 50));
     }
 
     /**

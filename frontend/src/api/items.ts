@@ -9,6 +9,7 @@ export interface ItemInput {
   name: string
   creditPrice: number
   cashPrice: number
+  unit: string
 }
 
 export function useItems() {

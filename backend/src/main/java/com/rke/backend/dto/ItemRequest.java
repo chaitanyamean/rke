@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 
 public record ItemRequest(
@@ -20,6 +21,10 @@ public record ItemRequest(
 
         @NotNull(message = "Cash price is required")
         @Positive(message = "Cash price must be greater than 0")
-        BigDecimal cashPrice
+        BigDecimal cashPrice,
+
+        @NotBlank(message = "Unit is required")
+        @Pattern(regexp = "Bag|Bottle|Pkt", message = "Unit must be one of Bag, Bottle, Pkt")
+        String unit
 ) {
 }

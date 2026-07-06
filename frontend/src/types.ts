@@ -66,6 +66,8 @@ export interface Farmer {
   updatedAt: string
 }
 
+export const ITEM_UNITS = ['Bag', 'Bottle', 'Pkt'] as const
+
 export interface Item {
   id: string
   tenantId: string
@@ -73,6 +75,7 @@ export interface Item {
   name: string
   creditPrice: number
   cashPrice: number
+  unit: string
   createdAt: string
   updatedAt: string
 }

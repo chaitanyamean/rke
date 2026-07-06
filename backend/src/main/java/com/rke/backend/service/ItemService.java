@@ -59,6 +59,7 @@ public class ItemService {
                 .name(request.name().trim())
                 .creditPrice(request.creditPrice())
                 .cashPrice(request.cashPrice())
+                .unit(request.unit())
                 .build();
         item = repository.save(item);
         auditService.record("items", item.getId(), AuditAction.INSERT,
@@ -75,6 +76,7 @@ public class ItemService {
         item.setName(request.name().trim());
         item.setCreditPrice(request.creditPrice());
         item.setCashPrice(request.cashPrice());
+        item.setUnit(request.unit());
         item = repository.save(item);
         auditService.record("items", item.getId(), AuditAction.UPDATE,
                 before, auditService.snapshot(item));
