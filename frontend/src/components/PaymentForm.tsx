@@ -54,11 +54,16 @@ export default function PaymentForm({ direction }: Props) {
     billTypeId &&
     composedBillNumber &&
     txDate &&
+    txDate <= today() &&
     parseFloat(amount) > 0
 
   const title = direction === 'payment' ? 'Cash Payment' : 'Cash Receipt'
 
   const handleEnd = () => {
+    if (txDate > today()) {
+      setError('Date cannot be in the future.')
+      return
+    }
     if (!isFormComplete) {
       setError('Please complete all required fields.')
       return
@@ -257,6 +262,7 @@ export default function PaymentForm({ direction }: Props) {
             <input
               type="date"
               value={txDate}
+              max={today()}
               onChange={(e) => setTxDate(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2"
             />

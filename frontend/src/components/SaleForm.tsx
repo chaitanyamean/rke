@@ -117,10 +117,15 @@ export default function SaleForm({ saleType }: Props) {
     billTypeId &&
     composedBillNumber &&
     txDate &&
+    txDate <= today() &&
     lines.length > 0 &&
     lines.every((l) => l.itemId && parseFloat(l.quantity) > 0 && parseFloat(l.price) >= 0)
 
   const handleEnd = () => {
+    if (txDate > today()) {
+      setError('Transaction date cannot be in the future.')
+      return
+    }
     if (!isFormComplete) {
       setError('Please complete all fields before reviewing.')
       return
@@ -370,6 +375,7 @@ export default function SaleForm({ saleType }: Props) {
           <input
             type="date"
             value={txDate}
+            max={today()}
             onChange={(e) => setTxDate(e.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
           />
