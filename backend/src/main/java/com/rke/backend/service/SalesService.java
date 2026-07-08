@@ -96,11 +96,15 @@ public class SalesService {
         String billNumber = resolveBillNumber(
                 request.billNumber(), tenantId, billNumberType.getItemCategoryId());
 
-        // 5. Now write: transaction header first.
+        // 5. Generate the human-readable transaction number: {YYYY}-{billNumber}-{increment}.
+        String transactionNo = generateTransactionNo(tenantId, billNumber);
+
+        // 6. Now write: transaction header first.
         Transaction tx = Transaction.builder()
                 .tenantId(tenantId)
                 .farmerId(request.farmerId())
                 .billNumber(billNumber)
+                .transactionNo(transactionNo)
                 .billNumberTypeId(request.billNumberTypeId())
                 .transactionType(type)
                 .transactionDate(request.transactionDate())
@@ -111,7 +115,7 @@ public class SalesService {
 
         transactionRepository.save(tx);
 
-        // 6. Write line items.
+        // 7. Write line items.
         List<TransactionItem> savedItems = new ArrayList<>(lines.size());
         for (PricedLine line : lines) {
             TransactionItem item = TransactionItem.builder()
@@ -125,7 +129,7 @@ public class SalesService {
             savedItems.add(transactionItemRepository.save(item));
         }
 
-        // 7. Audit.
+        // 8. Audit.
         auditService.record("transactions", tx.getId(), AuditAction.INSERT, null,
                 auditService.snapshot(tx));
 
@@ -222,5 +226,22 @@ public class SalesService {
                 .getSingleResult();
 
         return generated;
+    }
+
+    /**
+     * Calls {@code next_transaction_no()} to atomically increment the per-tenant
+     * counter and format {@code {YYYY}-{billNumber}-{increment}}. Same flush +
+     * clear treatment as {@link #resolveBillNumber} so the EntityManager doesn't
+     * interfere with the row lock taken by the Postgres function.
+     */
+    private String generateTransactionNo(UUID tenantId, String billNumber) {
+        entityManager.flush();
+        entityManager.clear();
+
+        return (String) entityManager
+                .createNativeQuery("SELECT next_transaction_no(:tenantId, :billNumber)")
+                .setParameter("tenantId", tenantId)
+                .setParameter("billNumber", billNumber)
+                .getSingleResult();
     }
 }

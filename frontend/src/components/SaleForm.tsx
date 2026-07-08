@@ -6,6 +6,7 @@ import { useBillNumberTypes } from '../api/billNumberTypes'
 import { useItemCategories } from '../api/itemCategories'
 import { useItems } from '../api/items'
 import FarmerSelector from './FarmerSelector'
+import SearchSelect from './SearchSelect'
 
 type SaleType = 'cash' | 'credit'
 
@@ -61,6 +62,19 @@ export default function SaleForm({ saleType }: Props) {
   const createCash = useCreateCashSale()
   const createCredit = useCreateCreditSale()
 
+  const selectedBillType = useMemo(
+    () => allBillTypes.find((b) => b.id === billTypeId) ?? null,
+    [allBillTypes, billTypeId],
+  )
+
+  // Bill number actually stored/shown: "{BillNumberType.name}-{bill number}"
+  // e.g. type "CS" + number "0001" -> "CS-0001".
+  const composedBillNumber = useMemo(() => {
+    const trimmed = billNumber.trim()
+    if (!trimmed) return ''
+    return selectedBillType ? `${selectedBillType.name}-${trimmed}` : trimmed
+  }, [selectedBillType, billNumber])
+
   // Auto-fetch bill number preview when bill type changes.
   const previewAbort = useRef<AbortController | null>(null)
   useEffect(() => {
@@ -101,7 +115,7 @@ export default function SaleForm({ saleType }: Props) {
     farmer &&
     categoryId &&
     billTypeId &&
-    billNumber.trim() &&
+    composedBillNumber &&
     txDate &&
     lines.length > 0 &&
     lines.every((l) => l.itemId && parseFloat(l.quantity) > 0 && parseFloat(l.price) >= 0)
@@ -125,7 +139,7 @@ export default function SaleForm({ saleType }: Props) {
       const payload: SaleInput = {
         farmerId: farmer.id,
         billNumberTypeId: billTypeId,
-        billNumber: billNumber.trim(),
+        billNumber: composedBillNumber,
         transactionDate: txDate,
         items: lines.map((l) => ({
           itemId: l.itemId,
@@ -136,7 +150,7 @@ export default function SaleForm({ saleType }: Props) {
       }
       const mut = saleType === 'cash' ? createCash : createCredit
       const tx = await mut.mutateAsync(payload)
-      setSavedTxId(tx.id)
+      setSavedTxId(tx.transactionNo)
       setSaving(false)
       setPhase('done')
     } catch (e: unknown) {
@@ -173,9 +187,9 @@ export default function SaleForm({ saleType }: Props) {
         <div className="mb-2 text-4xl">✓</div>
         <h2 className="mb-1 text-xl font-bold text-green-800">{title} Saved</h2>
         <p className="mb-1 text-sm text-green-700">
-          Bill Number: <span className="font-semibold">{billNumber}</span>
+          Bill Number: <span className="font-semibold">{composedBillNumber}</span>
         </p>
-        <p className="mb-6 text-xs text-green-600 break-all">Transaction ID: {savedTxId}</p>
+        <p className="mb-6 text-xs text-green-600 break-all">Transaction No: {savedTxId}</p>
         <button
           onClick={handleReset}
           className="rounded-md bg-green-700 px-6 py-2 text-white hover:bg-green-800"
@@ -201,7 +215,7 @@ export default function SaleForm({ saleType }: Props) {
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3 text-sm">
           <Row label="Farmer" value={`${farmer?.name}${farmer?.fatherName ? ' / ' + farmer.fatherName : ''}`} />
-          <Row label="Bill Number" value={billNumber} />
+          <Row label="Bill Number" value={composedBillNumber} />
           <Row label="Date" value={txDate} />
           <Row label="Remarks" value={remarks || '—'} />
 
@@ -325,8 +339,9 @@ export default function SaleForm({ saleType }: Props) {
                   setBillNumber(e.target.value)
                   setBillNumberAuto(false)
                 }}
-                placeholder="Bill Number"
-                className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+                disabled={!billTypeId}
+                placeholder={billTypeId ? 'Bill Number' : 'Select bill number type first'}
+                className="flex-1 rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
               />
               {/* <button
                 type="button"
@@ -342,6 +357,11 @@ export default function SaleForm({ saleType }: Props) {
                 Auto
               </button> */}
             </div>
+            {composedBillNumber && (
+              <p className="mt-1 text-xs text-slate-500">
+                Will be saved as: <span className="font-mono font-medium">{composedBillNumber}</span>
+              </p>
+            )}
           </label>
         </div>
 
@@ -437,25 +457,22 @@ interface LineRowProps {
   onRemove?: () => void
 }
 
-function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange, onRemove }: LineRowProps) {
+function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange: _onPriceChange, onRemove }: LineRowProps) {
   const amount = (parseFloat(line.quantity) || 0) * (parseFloat(line.price) || 0)
-  console.log("Items", items);
+  const itemOptions = useMemo(() => items.map((i) => ({ id: i.id, label: i.name })), [items])
+
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="flex-1 min-w-[160px]">
         <span className="mb-1 block text-xs font-medium text-slate-500">Item</span>
-        <select
+        <SearchSelect
+          options={itemOptions}
           value={line.itemId}
-          onChange={(e) => onItemChange(e.target.value)}
-          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-        >
-          <option value="">Select item…</option>
-          {items.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.name}
-            </option>
-          ))}
-        </select>
+          onChange={onItemChange}
+          placeholder="Search item…"
+          disabledPlaceholder="Select category first"
+          disabled={items.length === 0}
+        />
       </div>
 
       <div className="w-20">
@@ -470,7 +487,7 @@ function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange, onRemo
         />
       </div>
 
-      <div className="w-24">
+      {/* <div className="w-24">
         <span className="mb-1 block text-xs font-medium text-slate-500">Price (₹)</span>
         <input
           type="number"
@@ -480,7 +497,7 @@ function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange, onRemo
           onChange={(e) => onPriceChange(e.target.value)}
           className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
         />
-      </div>
+      </div> */}
 
       <div className="w-24 text-right">
         <span className="mb-1 block text-xs font-medium text-slate-500">Amount</span>

@@ -110,7 +110,7 @@ export default function ReturnForm() {
         items: validLines.map((l) => ({ itemId: l.id, quantity: l.qty })),
         remarks: remarks.trim() || undefined,
       })
-      setSavedTxId(tx.id)
+      setSavedTxId(tx.transactionNo)
       setSavedReturnBill(tx.billNumber)
       setPhase('done')
     } catch (e: unknown) {
@@ -148,7 +148,7 @@ export default function ReturnForm() {
         <p className="mb-1 text-sm text-green-700">
           Return Bill: <span className="font-semibold">{savedReturnBill}</span>
         </p>
-        <p className="mb-6 text-xs text-green-600 break-all">Transaction ID: {savedTxId}</p>
+        <p className="mb-6 text-xs text-green-600 break-all">Transaction No: {savedTxId}</p>
         <button
           onClick={handleReset}
           className="rounded-md bg-green-700 px-6 py-2 text-white hover:bg-green-800"

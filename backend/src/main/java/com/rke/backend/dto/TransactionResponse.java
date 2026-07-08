@@ -11,6 +11,8 @@ import com.rke.backend.domain.enums.TransactionType;
 
 public record TransactionResponse(
         UUID id,
+        /** Human-readable transaction number: {YYYY}-{billNumber}-{increment}. */
+        String transactionNo,
         UUID farmerId,
         String billNumber,
         /** Non-null only for RETURN transactions. */
@@ -26,6 +28,7 @@ public record TransactionResponse(
     public static TransactionResponse from(Transaction tx, List<TransactionItemResponse> items) {
         return new TransactionResponse(
                 tx.getId(),
+                tx.getTransactionNo(),
                 tx.getFarmerId(),
                 tx.getBillNumber(),
                 tx.getOriginalBillNumber(),

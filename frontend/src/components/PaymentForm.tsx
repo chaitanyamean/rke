@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Farmer } from '../types'
 import type { PaymentInput } from '../api/payments'
 import { useCreatePayment, useCreateReceipt, useFarmerBalance } from '../api/payments'
@@ -36,10 +36,23 @@ export default function PaymentForm({ direction }: Props) {
   const createPayment = useCreatePayment()
   const createReceipt = useCreateReceipt()
 
+  const selectedBillType = useMemo(
+    () => billTypes.find((b) => b.id === billTypeId) ?? null,
+    [billTypes, billTypeId],
+  )
+
+  // Bill number actually stored/shown: "{BillNumberType.name}-{bill number}"
+  // e.g. type "RKEPV" + number "0001" -> "RKEPV-0001".
+  const composedBillNumber = useMemo(() => {
+    const trimmed = billNumber.trim()
+    if (!trimmed) return ''
+    return selectedBillType ? `${selectedBillType.name}-${trimmed}` : trimmed
+  }, [selectedBillType, billNumber])
+
   const isFormComplete =
     farmer &&
     billTypeId &&
-    billNumber.trim() &&
+    composedBillNumber &&
     txDate &&
     parseFloat(amount) > 0
 
@@ -64,14 +77,14 @@ export default function PaymentForm({ direction }: Props) {
       const payload: PaymentInput = {
         farmerId: farmer.id,
         billNumberTypeId: billTypeId,
-        billNumber: billNumber.trim(),
+        billNumber: composedBillNumber,
         transactionDate: txDate,
         amount: parseFloat(amount),
         remarks: remarks.trim() || undefined,
       }
       const mut = direction === 'payment' ? createPayment : createReceipt
       const tx = await mut.mutateAsync(payload)
-      setSavedTxId(tx.id)
+      setSavedTxId(tx.transactionNo)
       setSaving(false)
       setPhase('done')
     } catch (e: unknown) {
@@ -104,9 +117,9 @@ export default function PaymentForm({ direction }: Props) {
         <div className="mb-2 text-4xl">✓</div>
         <h2 className="mb-1 text-xl font-bold text-green-800">{title} Saved</h2>
         <p className="mb-1 text-sm text-green-700">
-          Bill Number: <span className="font-semibold">{billNumber}</span>
+          Bill Number: <span className="font-semibold">{composedBillNumber}</span>
         </p>
-        <p className="mb-6 text-xs text-green-600 break-all">Transaction ID: {savedTxId}</p>
+        <p className="mb-6 text-xs text-green-600 break-all">Transaction No: {savedTxId}</p>
         <button
           onClick={handleReset}
           className="rounded-md bg-green-700 px-6 py-2 text-white hover:bg-green-800"
@@ -128,7 +141,7 @@ export default function PaymentForm({ direction }: Props) {
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3 text-sm">
           <Row label="Farmer" value={`${farmer?.name}${farmer?.fatherName ? ' / ' + farmer.fatherName : ''}`} />
           <Row label="Bill Type" value={billTypeName} />
-          <Row label="Bill Number" value={billNumber} />
+          <Row label="Bill Number" value={composedBillNumber} />
           <Row label="Date" value={txDate} />
           <Row label="Remarks" value={remarks || '—'} />
           <hr className="border-slate-100" />
@@ -226,9 +239,15 @@ export default function PaymentForm({ direction }: Props) {
               type="text"
               value={billNumber}
               onChange={(e) => setBillNumber(e.target.value)}
-              placeholder="Enter bill number"
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              disabled={!billTypeId}
+              placeholder={billTypeId ? 'Enter bill number' : 'Select bill number type first'}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
             />
+            {composedBillNumber && (
+              <p className="mt-1 text-xs text-slate-500">
+                Will be saved as: <span className="font-mono font-medium">{composedBillNumber}</span>
+              </p>
+            )}
           </label>
 
           <label className="block">

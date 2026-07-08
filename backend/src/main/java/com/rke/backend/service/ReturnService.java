@@ -26,6 +26,8 @@ import com.rke.backend.repository.TransactionItemRepository;
 import com.rke.backend.repository.TransactionRepository;
 import com.rke.backend.security.CurrentUserService;
 
+import jakarta.persistence.EntityManager;
+
 @Service
 public class ReturnService {
 
@@ -33,15 +35,18 @@ public class ReturnService {
     private final TransactionItemRepository transactionItemRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
+    private final EntityManager entityManager;
 
     public ReturnService(TransactionRepository transactionRepository,
                          TransactionItemRepository transactionItemRepository,
                          AuditService auditService,
-                         CurrentUserService currentUserService) {
+                         CurrentUserService currentUserService,
+                         EntityManager entityManager) {
         this.transactionRepository = transactionRepository;
         this.transactionItemRepository = transactionItemRepository;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -126,11 +131,15 @@ public class ReturnService {
         // 4. Generate a unique return bill number derived from the original.
         String returnBillNumber = generateReturnBillNumber(request.originalBillNumber(), tenantId);
 
+        // 4b. Generate the human-readable transaction number for this return.
+        String transactionNo = generateTransactionNo(tenantId, returnBillNumber);
+
         // 5. Insert the return transaction. The original row is never touched.
         Transaction returnTx = Transaction.builder()
                 .tenantId(tenantId)
                 .farmerId(original.getFarmerId())
                 .billNumber(returnBillNumber)
+                .transactionNo(transactionNo)
                 .billNumberTypeId(original.getBillNumberTypeId())
                 .transactionType(TransactionType.RETURN)
                 .transactionDate(request.returnDate())
@@ -197,5 +206,20 @@ public class ReturnService {
             }
         }
         return base + "-" + System.currentTimeMillis();
+    }
+
+    /**
+     * Calls {@code next_transaction_no()} to atomically increment the per-tenant
+     * counter and format {@code {YYYY}-{billNumber}-{increment}}.
+     */
+    private String generateTransactionNo(UUID tenantId, String billNumber) {
+        entityManager.flush();
+        entityManager.clear();
+
+        return (String) entityManager
+                .createNativeQuery("SELECT next_transaction_no(:tenantId, :billNumber)")
+                .setParameter("tenantId", tenantId)
+                .setParameter("billNumber", billNumber)
+                .getSingleResult();
     }
 }

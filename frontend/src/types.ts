@@ -114,6 +114,8 @@ export interface TransactionItem {
 
 export interface Transaction {
   id: string
+  /** Human-readable transaction number: {YYYY}-{billNumber}-{increment}, e.g. "2026-CS-0001-1". */
+  transactionNo: string
   farmerId: string
   billNumber: string
   /** Non-null only for RETURN transactions. */

@@ -21,6 +21,8 @@ import com.rke.backend.repository.FarmerRepository;
 import com.rke.backend.repository.TransactionRepository;
 import com.rke.backend.security.CurrentUserService;
 
+import jakarta.persistence.EntityManager;
+
 @Service
 public class PaymentService {
 
@@ -29,17 +31,20 @@ public class PaymentService {
     private final BillNumberTypeRepository billNumberTypeRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
+    private final EntityManager entityManager;
 
     public PaymentService(TransactionRepository transactionRepository,
                           FarmerRepository farmerRepository,
                           BillNumberTypeRepository billNumberTypeRepository,
                           AuditService auditService,
-                          CurrentUserService currentUserService) {
+                          CurrentUserService currentUserService,
+                          EntityManager entityManager) {
         this.transactionRepository = transactionRepository;
         this.farmerRepository = farmerRepository;
         this.billNumberTypeRepository = billNumberTypeRepository;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -63,10 +68,13 @@ public class PaymentService {
                     "Bill number already exists: " + request.billNumber());
         }
 
+        String transactionNo = generateTransactionNo(tenantId, request.billNumber());
+
         Transaction tx = Transaction.builder()
                 .tenantId(tenantId)
                 .farmerId(request.farmerId())
                 .billNumber(request.billNumber())
+                .transactionNo(transactionNo)
                 .billNumberTypeId(request.billNumberTypeId())
                 .transactionType(type)
                 .transactionDate(request.transactionDate())
@@ -80,6 +88,21 @@ public class PaymentService {
                 auditService.snapshot(tx));
 
         return TransactionResponse.from(tx, List.of());
+    }
+
+    /**
+     * Calls {@code next_transaction_no()} to atomically increment the per-tenant
+     * counter and format {@code {YYYY}-{billNumber}-{increment}}.
+     */
+    private String generateTransactionNo(UUID tenantId, String billNumber) {
+        entityManager.flush();
+        entityManager.clear();
+
+        return (String) entityManager
+                .createNativeQuery("SELECT next_transaction_no(:tenantId, :billNumber)")
+                .setParameter("tenantId", tenantId)
+                .setParameter("billNumber", billNumber)
+                .getSingleResult();
     }
 
     /**
