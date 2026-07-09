@@ -64,7 +64,7 @@ services:
       context: ./frontend
       args:
         # Baked into the static bundle; the browser reaches the backend on the host port.
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_API_BASE_URL: http://localhost:8000
     container_name: rke-frontend
     depends_on:
       - backend

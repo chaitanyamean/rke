@@ -124,7 +124,7 @@ export default function DashboardPage() {
                     </td>
                   </tr>
                 )}
-                {recent.map((tx: RecentTransaction, i) => {
+                {recent && recent.map((tx: RecentTransaction, i) => {
                   const meta = typeMeta(tx.type)
                   return (
                     <tr key={`${tx.billNumber}-${i}`} className="border-t border-slate-100">
