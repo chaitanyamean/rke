@@ -35,4 +35,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
      * the Hibernate filter. Used by ReturnService to fetch the original sale.
      */
     Optional<Transaction> findByBillNumber(String billNumber);
+
+    /**
+     * All RETURN transactions recorded against a given original bill number, in a
+     * given status. {@code originalBillNumber} is only ever set on RETURN rows, so
+     * no explicit type filter is needed. Used to compute cumulative returned
+     * quantity so a bill can't be over-returned across multiple submissions.
+     */
+    List<Transaction> findByOriginalBillNumberAndStatus(String originalBillNumber, TransactionStatus status);
 }

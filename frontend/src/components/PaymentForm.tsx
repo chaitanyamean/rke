@@ -185,7 +185,7 @@ export default function PaymentForm({ direction }: Props) {
       {/* Farmer + Balance */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Farmer</h2>
-        <FarmerSelector onChange={setFarmer} />
+        <FarmerSelector value={farmer} onChange={setFarmer} />
 
         {farmer && (
           <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">

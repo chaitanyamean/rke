@@ -6,8 +6,15 @@ import AddFarmerModal from './AddFarmerModal'
 import type { Farmer } from '../types'
 
 interface FarmerSelectorProps {
+  /** Currently selected farmer, if any — used to restore the fields (e.g. when
+   * this component remounts after navigating back from a review screen). */
+  value?: Farmer | null
   /** Called with the fully resolved farmer, or null while the selection is incomplete. */
   onChange: (farmer: Farmer | null) => void
+  /** Show the "+ New Farmer" quick-add action. Cash/credit sales need it since the
+   * farmer may not exist yet; returns must always target an existing farmer, so
+   * it's hidden there. Defaults to true. */
+  allowAddFarmer?: boolean
 }
 
 /**
@@ -18,10 +25,10 @@ interface FarmerSelectorProps {
  * Each step is a type-to-search combobox (SearchSelect) rather than a plain
  * <select>, since village/farmer lists can get long.
  */
-export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
-  const [villageId, setVillageId] = useState('')
-  const [name, setName] = useState('')
-  const [farmerId, setFarmerId] = useState('')
+export default function FarmerSelector({ value, onChange, allowAddFarmer = true }: FarmerSelectorProps) {
+  const [villageId, setVillageId] = useState(value?.villageId ?? '')
+  const [name, setName] = useState(value?.name ?? '')
+  const [farmerId, setFarmerId] = useState(value?.id ?? '')
   const [showAddFarmer, setShowAddFarmer] = useState(false)
 
   const { data: villages = [] } = useVillages()
@@ -87,7 +94,9 @@ export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Village</span>
+        <span className="mb-1 block text-sm font-medium text-slate-700">
+          Village <span className="text-red-500">*</span>
+        </span>
         <SearchSelect
           options={villageOptions}
           value={villageId}
@@ -98,14 +107,18 @@ export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
 
       <div className="block">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-700">Farmer Name</span>
-          <button
-            type="button"
-            onClick={() => setShowAddFarmer(true)}
-            className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline"
-          >
-            + New Farmer
-          </button>
+          <span className="text-sm font-medium text-slate-700">
+            Farmer Name <span className="text-red-500">*</span>
+          </span>
+          {allowAddFarmer && (
+            <button
+              type="button"
+              onClick={() => setShowAddFarmer(true)}
+              className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+            >
+              + New Farmer
+            </button>
+          )}
         </div>
         <SearchSelect
           options={nameOptions}
@@ -119,7 +132,9 @@ export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Father Name</span>
+        <span className="mb-1 block text-sm font-medium text-slate-700">
+          Father Name <span className="text-red-500">*</span>
+        </span>
         <SearchSelect
           options={candidateOptions}
           value={farmerId}
@@ -140,7 +155,7 @@ export default function FarmerSelector({ onChange }: FarmerSelectorProps) {
         />
       </label>
 
-      {showAddFarmer && (
+      {allowAddFarmer && showAddFarmer && (
         <AddFarmerModal
           initialVillageId={villageId || undefined}
           onCreated={handleFarmerCreated}

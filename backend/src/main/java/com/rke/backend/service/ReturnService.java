@@ -18,6 +18,8 @@ import com.rke.backend.domain.TransactionItem;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.TransactionStatus;
 import com.rke.backend.domain.enums.TransactionType;
+import com.rke.backend.dto.OriginalSaleItemResponse;
+import com.rke.backend.dto.OriginalSaleResponse;
 import com.rke.backend.dto.ReturnLineItemRequest;
 import com.rke.backend.dto.ReturnRequest;
 import com.rke.backend.dto.TransactionItemResponse;
@@ -53,15 +55,47 @@ public class ReturnService {
      * Looks up the original sale by bill number and returns its full details for
      * the frontend to display before the user finalises the return quantities.
      * Only CASH_SALE and CREDIT_SALE transactions are considered returnable.
+     *
+     * <p>Each line item is enriched with {@code alreadyReturnedQuantity} (summed
+     * across all prior ACTIVE returns against this bill) and
+     * {@code returnableQuantity} — the real remaining cap — so the frontend can
+     * enforce the same limit the server will enforce on save, without having to
+     * duplicate the cumulative-sum logic itself.
      */
     @Transactional(readOnly = true)
-    public TransactionResponse getOriginal(String billNumber) {
+    public OriginalSaleResponse getOriginal(String billNumber) {
         Transaction original = requireSale(billNumber);
-        List<TransactionItemResponse> items = transactionItemRepository
+        Map<UUID, BigDecimal> alreadyReturned = alreadyReturnedQuantities(billNumber);
+
+        List<OriginalSaleItemResponse> items = transactionItemRepository
                 .findByTransactionId(original.getId()).stream()
-                .map(TransactionItemResponse::from)
+                .map(item -> {
+                    BigDecimal returned = alreadyReturned.getOrDefault(item.getItemId(), BigDecimal.ZERO);
+                    BigDecimal remaining = item.getQuantity().subtract(returned).max(BigDecimal.ZERO);
+                    return new OriginalSaleItemResponse(
+                            item.getItemId(), item.getQuantity(), item.getPrice(), item.getAmount(),
+                            returned, remaining);
+                })
                 .toList();
-        return TransactionResponse.from(original, items);
+        return OriginalSaleResponse.of(original, items);
+    }
+
+    /**
+     * Sums, per itemId, the quantities returned by all prior ACTIVE returns
+     * recorded against {@code originalBillNumber}. Voided returns are excluded —
+     * voiding a return frees up its quantity for a fresh return.
+     */
+    private Map<UUID, BigDecimal> alreadyReturnedQuantities(String originalBillNumber) {
+        List<Transaction> priorReturns = transactionRepository
+                .findByOriginalBillNumberAndStatus(originalBillNumber, TransactionStatus.ACTIVE);
+        if (priorReturns.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> returnTxIds = priorReturns.stream().map(Transaction::getId).toList();
+        return transactionItemRepository.findByTransactionIdIn(returnTxIds).stream()
+                .collect(Collectors.groupingBy(
+                        TransactionItem::getItemId,
+                        Collectors.reducing(BigDecimal.ZERO, TransactionItem::getQuantity, BigDecimal::add)));
     }
 
     /**
@@ -74,10 +108,11 @@ public class ReturnService {
      * sign already encodes direction. Filtering to {@code transaction_type = 'return'}
      * or joining on {@code original_bill_number} gives the return-detail view.
      *
-     * <p><b>Validation:</b> Each requested return quantity must not exceed the
-     * quantity in the original transaction's corresponding line item. Cumulative
-     * return validation (accounting for prior partial returns against the same bill)
-     * is deferred to Phase 7.
+     * <p><b>Validation:</b> Each requested return quantity, added to the quantity
+     * already returned by prior ACTIVE returns against the same bill and item,
+     * must not exceed the quantity in the original transaction's corresponding
+     * line item. This guards against over-returning across multiple separate
+     * return submissions for the same bill.
      */
     @Transactional
     public TransactionResponse createReturn(ReturnRequest request) {
@@ -103,6 +138,9 @@ public class ReturnService {
                 .stream()
                 .collect(Collectors.toMap(TransactionItem::getItemId, Function.identity()));
 
+        // 2b. Quantity already consumed by prior ACTIVE returns against this bill.
+        Map<UUID, BigDecimal> alreadyReturned = alreadyReturnedQuantities(request.originalBillNumber());
+
         // 3. Validate ALL return items before writing anything.
         record ReturnLine(UUID itemId, BigDecimal quantity, BigDecimal price, BigDecimal amount) {}
         List<ReturnLine> lines = new ArrayList<>(request.items().size());
@@ -114,10 +152,15 @@ public class ReturnService {
                         "Item " + req.itemId() + " was not in original transaction "
                                 + request.originalBillNumber());
             }
-            if (req.quantity().compareTo(orig.getQuantity()) > 0) {
+            BigDecimal returnedSoFar = alreadyReturned.getOrDefault(req.itemId(), BigDecimal.ZERO);
+            BigDecimal totalAfterThisReturn = returnedSoFar.add(req.quantity());
+            if (totalAfterThisReturn.compareTo(orig.getQuantity()) > 0) {
+                BigDecimal remaining = orig.getQuantity().subtract(returnedSoFar).max(BigDecimal.ZERO);
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Return quantity " + req.quantity() + " exceeds original sold quantity "
-                                + orig.getQuantity() + " for item " + req.itemId());
+                        "Return quantity " + req.quantity() + " for item " + req.itemId()
+                                + " exceeds the remaining returnable quantity " + remaining
+                                + " (originally sold " + orig.getQuantity()
+                                + ", already returned " + returnedSoFar + ")");
             }
             // amount is NEGATIVE — see Javadoc convention above.
             BigDecimal amount = req.quantity().multiply(orig.getPrice()).negate();

@@ -10,4 +10,7 @@ import com.rke.backend.domain.TransactionItem;
 public interface TransactionItemRepository extends JpaRepository<TransactionItem, UUID> {
 
     List<TransactionItem> findByTransactionId(UUID transactionId);
+
+    /** Line items across several transactions at once — used to sum prior returns. */
+    List<TransactionItem> findByTransactionIdIn(List<UUID> transactionIds);
 }

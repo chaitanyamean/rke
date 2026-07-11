@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Farmer } from '../types'
 import { useOriginalTransaction, useCreateReturn } from '../api/returns'
 import { useItems } from '../api/items'
-import { useItemCategories } from '../api/itemCategories'
+// import { useItemCategories } from '../api/itemCategories'
 import FarmerSelector from './FarmerSelector'
 
 type Phase = 'form' | 'done'
@@ -20,7 +20,7 @@ export default function ReturnForm() {
   const [farmer, setFarmer] = useState<Farmer | null>(null)
 
   // Step 2: Item Category (for UX context only — not used to filter the fetch)
-  const [categoryId, setCategoryId] = useState('')
+  //const [categoryId, setCategoryId] = useState('')
 
   // Step 3: Bill number lookup
   const [billInput, setBillInput] = useState('')
@@ -36,7 +36,7 @@ export default function ReturnForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { data: categories = [] } = useItemCategories()
+  // const { data: categories = [] } = useItemCategories()
   const { data: allItems = [] } = useItems()
   const {
     data: originalTx,
@@ -63,7 +63,7 @@ export default function ReturnForm() {
     setFarmerMismatch(false)
     setCheckedIds(new Set())
     setReturnQtys(
-      new Map(originalTx.items.map((item) => [item.itemId, String(item.quantity)])),
+      new Map(originalTx.items.map((item) => [item.itemId, String(item.returnableQuantity)])),
     )
   }, [originalTx, farmer])
 
@@ -93,13 +93,18 @@ export default function ReturnForm() {
     ? Array.from(checkedIds).map((id) => {
         const orig = originalTx.items.find((i) => i.itemId === id)
         const qty = parseFloat(returnQtys.get(id) ?? '0')
-        return { id, qty, origQty: orig?.quantity ?? 0, valid: qty > 0 && qty <= (orig?.quantity ?? 0) }
+        const cap = orig?.returnableQuantity ?? 0
+        return { id, qty, origQty: cap, valid: qty > 0 && qty <= cap }
       })
     : []
   const allLinesValid = validLines.length > 0 && validLines.every((l) => l.valid)
 
   const handleSave = async () => {
     if (!farmer || !originalTx || !allLinesValid) return
+    if (returnDate > today()) {
+      setError('Return date cannot be in the future.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -126,7 +131,7 @@ export default function ReturnForm() {
   const handleReset = () => {
     setPhase('form')
     setFarmer(null)
-    setCategoryId('')
+    // setCategoryId('')
     setBillInput('')
     setQueryBill(null)
     setReturnDate(today())
@@ -169,11 +174,14 @@ export default function ReturnForm() {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Farmer
         </h2>
-        <FarmerSelector onChange={(f) => { setFarmer(f); setQueryBill(null); setBillInput(''); setFarmerMismatch(false) }} />
+        <FarmerSelector
+          allowAddFarmer={false}
+          onChange={(f) => { setFarmer(f); setQueryBill(null); setBillInput(''); setFarmerMismatch(false) }}
+        />
       </section>
 
       {/* Item Category */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      {/* <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Item Category</span>
           <select
@@ -190,7 +198,7 @@ export default function ReturnForm() {
             ))}
           </select>
         </label>
-      </section>
+      </section> */}
 
       {/* Bill Number Lookup */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
@@ -260,7 +268,9 @@ export default function ReturnForm() {
                 const checked = checkedIds.has(item.itemId)
                 const qtyStr = returnQtys.get(item.itemId) ?? ''
                 const qty = parseFloat(qtyStr)
-                const qtyError = checked && (isNaN(qty) || qty <= 0 || qty > item.quantity)
+                const cap = item.returnableQuantity
+                const qtyError = checked && (isNaN(qty) || qty <= 0 || qty > cap)
+                const fullyReturned = cap <= 0
 
                 return (
                   <div
@@ -273,7 +283,8 @@ export default function ReturnForm() {
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleItem(item.itemId)}
-                      className="h-4 w-4 accent-slate-700"
+                      disabled={fullyReturned}
+                      className="h-4 w-4 accent-slate-700 disabled:opacity-40"
                     />
 
                     <span className="flex-1 text-sm font-medium text-slate-800">
@@ -282,6 +293,9 @@ export default function ReturnForm() {
 
                     <span className="text-xs text-slate-500">
                       Sold: {item.quantity} × ₹{item.price.toFixed(2)}
+                      {item.alreadyReturnedQuantity > 0 && (
+                        <> · Already returned: {item.alreadyReturnedQuantity}</>
+                      )}
                     </span>
 
                     <div className="flex items-center gap-1">
@@ -289,21 +303,21 @@ export default function ReturnForm() {
                       <input
                         type="number"
                         min="0.001"
-                        max={item.quantity}
+                        max={cap}
                         step="any"
                         value={qtyStr}
                         onChange={(e) => handleQty(item.itemId, e.target.value)}
-                        disabled={!checked}
+                        disabled={!checked || fullyReturned}
                         className={`w-20 rounded border px-2 py-1 text-sm disabled:bg-slate-50 ${
                           qtyError ? 'border-red-400' : 'border-slate-300'
                         }`}
                       />
                     </div>
 
-                    {qtyError && (
-                      <span className="text-xs text-red-500">
-                        1–{item.quantity}
-                      </span>
+                    {fullyReturned ? (
+                      <span className="text-xs text-slate-400">Fully returned</span>
+                    ) : (
+                      qtyError && <span className="text-xs text-red-500">1–{cap}</span>
                     )}
                   </div>
                 )
@@ -320,6 +334,7 @@ export default function ReturnForm() {
           <input
             type="date"
             value={returnDate}
+            max={today()}
             onChange={(e) => setReturnDate(e.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
           />

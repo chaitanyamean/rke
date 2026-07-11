@@ -39,9 +39,10 @@ public class FarmerController {
 
     @GetMapping
     public List<Farmer> search(@RequestParam(required = false) String name,
+                               @RequestParam(required = false) String fatherName,
                                @RequestParam(required = false) UUID villageId,
                                @RequestParam(required = false) String mobile) {
-        return service.search(name, villageId, mobile);
+        return service.search(name, fatherName, villageId, mobile);
     }
 
     @GetMapping("/{id}")

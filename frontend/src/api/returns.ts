@@ -1,13 +1,36 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { Transaction } from '../types'
+import type { Transaction, TransactionType } from '../types'
+
+/** A line item of the original sale, enriched with remaining-returnable quantity. */
+export interface OriginalSaleItem {
+  itemId: string
+  quantity: number
+  price: number
+  amount: number
+  /** Already returned by prior ACTIVE returns against this bill. */
+  alreadyReturnedQuantity: number
+  /** The real cap for a new return — quantity minus alreadyReturnedQuantity. */
+  returnableQuantity: number
+}
+
+export interface OriginalSale {
+  id: string
+  transactionNo: string
+  farmerId: string
+  billNumber: string
+  transactionType: TransactionType
+  transactionDate: string
+  grandTotal: number
+  items: OriginalSaleItem[]
+}
 
 /** Fetches the original sale by bill number for the "prefill items" step. */
 export function useOriginalTransaction(billNumber: string | null) {
   return useQuery({
     queryKey: ['return-original', billNumber],
     queryFn: async () =>
-      (await api.get<Transaction>(`/api/returns/by-bill?billNumber=${encodeURIComponent(billNumber!)}`)).data,
+      (await api.get<OriginalSale>(`/api/returns/by-bill?billNumber=${encodeURIComponent(billNumber!)}`)).data,
     enabled: !!billNumber,
     retry: false,
   })

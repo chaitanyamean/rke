@@ -92,7 +92,9 @@ export default function TenantFormPage() {
         className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
       >
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Name *</span>
+          <span className="mb-1 block text-sm font-medium text-slate-700">
+            Name <span className="text-red-500">*</span>
+          </span>
           <input
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
@@ -103,7 +105,7 @@ export default function TenantFormPage() {
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">
-            Slug *
+            Slug <span className="text-red-500">*</span>
             <span className="ml-1 text-xs font-normal text-slate-400">
               (lowercase letters, digits, hyphens)
             </span>

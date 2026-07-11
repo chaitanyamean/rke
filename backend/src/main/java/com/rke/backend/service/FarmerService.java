@@ -33,8 +33,8 @@ public class FarmerService {
     }
 
     @Transactional(readOnly = true)
-    public List<Farmer> search(String name, UUID villageId, String mobile) {
-        return repository.search(blankToNull(name), villageId, blankToNull(mobile));
+    public List<Farmer> search(String name, String fatherName, UUID villageId, String mobile) {
+        return repository.search(blankToNull(name), blankToNull(fatherName), villageId, blankToNull(mobile));
     }
 
     @Transactional(readOnly = true)

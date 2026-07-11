@@ -219,8 +219,9 @@ export default function SaleForm({ saleType }: Props) {
         <h1 className="text-2xl font-bold text-slate-800">{title} — Review</h1>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3 text-sm">
-          <Row label="Farmer" value={`${farmer?.name}${farmer?.fatherName ? ' / ' + farmer.fatherName : ''}`} />
-          <Row label="Bill Number" value={composedBillNumber} />
+          <Row label="Farmer" value={farmer?.name ?? ''} />
+          <Row label="Father Name" value={farmer?.fatherName || '—'} />
+          <Row label="Bill Id" value={composedBillNumber} />
           <Row label="Date" value={txDate} />
           <Row label="Remarks" value={remarks || '—'} />
 
@@ -287,7 +288,7 @@ export default function SaleForm({ saleType }: Props) {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Farmer
         </h2>
-        <FarmerSelector onChange={setFarmer} />
+        <FarmerSelector value={farmer} onChange={setFarmer} />
       </section>
 
       {/* Category + Bill Number Type */}
@@ -298,7 +299,9 @@ export default function SaleForm({ saleType }: Props) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Item Category</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Item Category <span className="text-red-500">*</span>
+            </span>
             <select
               value={categoryId}
               onChange={(e) => {
@@ -318,7 +321,9 @@ export default function SaleForm({ saleType }: Props) {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Bill Number Type</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Bill Number Type <span className="text-red-500">*</span>
+            </span>
             <select
               value={billTypeId}
               onChange={(e) => setBillTypeId(e.target.value)}
@@ -335,13 +340,17 @@ export default function SaleForm({ saleType }: Props) {
           </label>
 
           <label className="block sm:col-span-2">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Bill Number</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Bill Id <span className="text-red-500">*</span>
+            </span>
             <div className="flex gap-2">
               <input
                 type="text"
+                inputMode="numeric"
                 value={billNumber}
                 onChange={(e) => {
-                  setBillNumber(e.target.value)
+                  const digitsOnly = e.target.value.replace(/[^0-9]/g, '')
+                  setBillNumber(digitsOnly)
                   setBillNumberAuto(false)
                 }}
                 disabled={!billTypeId}
@@ -371,7 +380,9 @@ export default function SaleForm({ saleType }: Props) {
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Transaction Date</span>
+          <span className="mb-1 block text-sm font-medium text-slate-700">
+            Transaction Date <span className="text-red-500">*</span>
+          </span>
           <input
             type="date"
             value={txDate}
@@ -470,7 +481,9 @@ function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange: _onPri
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="flex-1 min-w-[160px]">
-        <span className="mb-1 block text-xs font-medium text-slate-500">Item</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">
+          Item <span className="text-red-500">*</span>
+        </span>
         <SearchSelect
           options={itemOptions}
           value={line.itemId}
@@ -482,7 +495,9 @@ function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange: _onPri
       </div>
 
       <div className="w-20">
-        <span className="mb-1 block text-xs font-medium text-slate-500">Qty</span>
+        <span className="mb-1 block text-xs font-medium text-slate-500">
+          Qty <span className="text-red-500">*</span>
+        </span>
         <input
           type="number"
           min="0.001"

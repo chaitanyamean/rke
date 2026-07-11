@@ -46,7 +46,9 @@ export default function ItemCategoriesPage() {
       <form onSubmit={onSubmit} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Name *</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Name <span className="text-red-500">*</span>
+            </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}

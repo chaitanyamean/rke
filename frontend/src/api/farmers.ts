@@ -6,6 +6,7 @@ const KEY = ['farmers']
 
 export interface FarmerFilters {
   name?: string
+  fatherName?: string
   villageId?: string
   mobile?: string
 }
@@ -22,6 +23,7 @@ export interface FarmerInput {
 export function useFarmers(filters: FarmerFilters = {}, enabled = true) {
   const params: Record<string, string> = {}
   if (filters.name) params.name = filters.name
+  if (filters.fatherName) params.fatherName = filters.fatherName
   if (filters.villageId) params.villageId = filters.villageId
   if (filters.mobile) params.mobile = filters.mobile
   return useQuery({

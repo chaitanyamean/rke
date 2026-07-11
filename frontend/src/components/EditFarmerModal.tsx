@@ -1,32 +1,29 @@
 import { useState, type FormEvent } from 'react'
 import { useVillages } from '../api/villages'
-import { useCreateFarmer } from '../api/farmers'
+import { useUpdateFarmer } from '../api/farmers'
 import { getErrorMessage } from '../lib/api'
 import type { Farmer } from '../types'
 
-interface AddFarmerModalProps {
-  /** Pre-selected village (from the parent selector), if any. Still editable. */
-  initialVillageId?: string
-  onCreated: (farmer: Farmer) => void
+interface EditFarmerModalProps {
+  farmer: Farmer
+  onUpdated: (farmer: Farmer) => void
   onClose: () => void
 }
 
 /**
- * Small modal for registering a farmer without leaving the current screen
- * (e.g. mid-sale, when the farmer doesn't exist yet). Mirrors the fields on
- * the full Farmer Registration page; village is still a real village-master
- * selection, not free text.
+ * Modal for editing an existing farmer's details. Mirrors AddFarmerModal's
+ * fields but pre-fills from the given farmer and calls the update endpoint.
  */
-export default function AddFarmerModal({ initialVillageId, onCreated, onClose }: AddFarmerModalProps) {
+export default function EditFarmerModal({ farmer, onUpdated, onClose }: EditFarmerModalProps) {
   const { data: villages = [] } = useVillages()
-  const create = useCreateFarmer()
+  const update = useUpdateFarmer()
 
-  const [name, setName] = useState('')
-  const [fatherName, setFatherName] = useState('')
-  const [villageId, setVillageId] = useState(initialVillageId ?? '')
-  const [address, setAddress] = useState('')
-  const [mobileNumber, setMobileNumber] = useState('')
-  const [reference, setReference] = useState('')
+  const [name, setName] = useState(farmer.name)
+  const [fatherName, setFatherName] = useState(farmer.fatherName ?? '')
+  const [villageId, setVillageId] = useState(farmer.villageId)
+  const [address, setAddress] = useState(farmer.address ?? '')
+  const [mobileNumber, setMobileNumber] = useState(farmer.mobileNumber ?? '')
+  const [reference, setReference] = useState(farmer.reference ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const onSubmit = async (e: FormEvent) => {
@@ -40,20 +37,23 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
       setError('Village is required')
       return
     }
-    if(!fatherName) {
+    if (!fatherName.trim()) {
       setError('Father name is required')
       return
     }
     try {
-      const farmer = await create.mutateAsync({
-        name: name.trim(),
-        fatherName: fatherName.trim() || undefined,
-        villageId,
-        address: address.trim() || undefined,
-        mobileNumber: mobileNumber.trim() || undefined,
-        reference: reference.trim() || undefined,
+      const updated = await update.mutateAsync({
+        id: farmer.id,
+        input: {
+          name: name.trim(),
+          fatherName: fatherName.trim() || undefined,
+          villageId,
+          address: address.trim() || undefined,
+          mobileNumber: mobileNumber.trim() || undefined,
+          reference: reference.trim() || undefined,
+        },
       })
-      onCreated(farmer)
+      onUpdated(updated)
     } catch (err) {
       setError(getErrorMessage(err))
     }
@@ -63,7 +63,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-800">New Farmer</h3>
+          <h3 className="text-lg font-semibold text-slate-800">Edit Farmer</h3>
           <button
             type="button"
             onClick={onClose}
@@ -80,7 +80,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
               Name <span className="text-red-500">*</span>
             </span>
             <input
-              id="farmer-name"
+              id="farmer-edit-name"
               name="name"
               autoFocus
               value={name}
@@ -94,7 +94,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
               Father Name <span className="text-red-500">*</span>
             </span>
             <input
-              id="farmer-father-name"
+              id="farmer-edit-father-name"
               name="fatherName"
               value={fatherName}
               onChange={(e) => setFatherName(e.target.value)}
@@ -107,7 +107,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
               Village <span className="text-red-500">*</span>
             </span>
             <select
-              id="farmer-village"
+              id="farmer-edit-village"
               name="villageId"
               value={villageId}
               onChange={(e) => setVillageId(e.target.value)}
@@ -125,7 +125,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Mobile Number</span>
             <input
-              id="farmer-mobile"
+              id="farmer-edit-mobile"
               name="mobileNumber"
               value={mobileNumber}
               onChange={(e) => setMobileNumber(e.target.value)}
@@ -137,7 +137,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Address</span>
             <input
-              id="farmer-address"
+              id="farmer-edit-address"
               name="address"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -148,7 +148,7 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Reference</span>
             <input
-              id="farmer-reference"
+              id="farmer-edit-reference"
               name="reference"
               value={reference}
               onChange={(e) => setReference(e.target.value)}
@@ -168,10 +168,10 @@ export default function AddFarmerModal({ initialVillageId, onCreated, onClose }:
             </button>
             <button
               type="submit"
-              disabled={create.isPending}
+              disabled={update.isPending}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
             >
-              {create.isPending ? 'Saving…' : 'Save & Select'}
+              {update.isPending ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </form>

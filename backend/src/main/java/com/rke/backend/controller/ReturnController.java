@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rke.backend.dto.OriginalSaleResponse;
 import com.rke.backend.dto.ReturnRequest;
 import com.rke.backend.dto.TransactionResponse;
 import com.rke.backend.service.ReturnService;
@@ -30,7 +31,7 @@ public class ReturnController {
      * can display its line items before the user selects return quantities.
      */
     @GetMapping("/by-bill")
-    public TransactionResponse getOriginal(@RequestParam String billNumber) {
+    public OriginalSaleResponse getOriginal(@RequestParam String billNumber) {
         return returnService.getOriginal(billNumber);
     }
 

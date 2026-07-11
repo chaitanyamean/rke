@@ -26,8 +26,16 @@ export default function FarmerRegistrationPage() {
     e.preventDefault()
     setError(null)
     setSuccess(null)
+    if (!form.name.trim()) {
+      setError('Farmer name is required')
+      return
+    }
     if (!form.villageId) {
       setError('Village is required')
+      return
+    }
+    if (!form.fatherName.trim()) {
+      setError('Father name is required')
       return
     }
     try {
@@ -53,16 +61,22 @@ export default function FarmerRegistrationPage() {
       <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Name *</span>
-            <input value={form.name} onChange={set('name')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Name <span className="text-red-500">*</span>
+            </span>
+            <input id="farmer-reg-name" name="name" value={form.name} onChange={set('name')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Father Name</span>
-            <input value={form.fatherName} onChange={set('fatherName')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Father Name <span className="text-red-500">*</span>
+            </span>
+            <input id="farmer-reg-father-name" name="fatherName" value={form.fatherName} onChange={set('fatherName')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Village *</span>
-            <select value={form.villageId} onChange={set('villageId')} className="w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="mb-1 block text-sm font-medium text-slate-700">
+              Village <span className="text-red-500">*</span>
+            </span>
+            <select id="farmer-reg-village" name="villageId" value={form.villageId} onChange={set('villageId')} className="w-full rounded-md border border-slate-300 px-3 py-2">
               <option value="">Select village…</option>
               {villages.map((v) => (
                 <option key={v.id} value={v.id}>{v.name}</option>
@@ -71,15 +85,15 @@ export default function FarmerRegistrationPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Mobile Number</span>
-            <input value={form.mobileNumber} onChange={set('mobileNumber')} placeholder="10 digits" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input id="farmer-reg-mobile" name="mobileNumber" value={form.mobileNumber} onChange={set('mobileNumber')} placeholder="10 digits" className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-sm font-medium text-slate-700">Address</span>
-            <input value={form.address} onChange={set('address')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input id="farmer-reg-address" name="address" value={form.address} onChange={set('address')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-sm font-medium text-slate-700">Reference</span>
-            <input value={form.reference} onChange={set('reference')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input id="farmer-reg-reference" name="reference" value={form.reference} onChange={set('reference')} className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
         </div>
 

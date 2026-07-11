@@ -21,11 +21,13 @@ public interface FarmerRepository extends JpaRepository<Farmer, UUID> {
     @Query("""
             SELECT f FROM Farmer f
             WHERE (:name IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%')))
+              AND (:fatherName IS NULL OR LOWER(f.fatherName) LIKE LOWER(CONCAT('%', CAST(:fatherName AS string), '%')))
               AND (:villageId IS NULL OR f.villageId = :villageId)
               AND (:mobile IS NULL OR f.mobileNumber LIKE CONCAT('%', CAST(:mobile AS string), '%'))
             ORDER BY f.name ASC
             """)
     List<Farmer> search(@Param("name") String name,
+                        @Param("fatherName") String fatherName,
                         @Param("villageId") UUID villageId,
                         @Param("mobile") String mobile);
 }
