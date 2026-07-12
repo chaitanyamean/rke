@@ -118,6 +118,11 @@ export default function Layout() {
               <Item to="/villages" label="Villages" />
               <Item to="/item-categories" label="Categories" />
               <Item to="/bill-number-types" label="Bill Types" />
+
+              <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-white/40">
+                Team
+              </p>
+              <Item to="/staff-users" label="Staff Users" />
             </>
           )}
 

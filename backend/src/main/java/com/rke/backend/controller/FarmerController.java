@@ -22,8 +22,9 @@ import com.rke.backend.service.PaymentService;
 import jakarta.validation.Valid;
 
 /**
- * Farmer registration and lookups. Open to any authenticated user (staff or
- * admin) — this is not admin-restricted master data.
+ * Farmer registration and lookups. Create and update are open to STAFF and
+ * ADMIN alike (per the fixed permission matrix) — farmers are not
+ * admin-restricted master data, unlike Items.
  */
 @RestController
 @RequestMapping("/api/farmers")

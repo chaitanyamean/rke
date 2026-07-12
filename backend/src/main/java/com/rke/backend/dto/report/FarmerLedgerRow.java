@@ -3,6 +3,7 @@ package com.rke.backend.dto.report;
 import java.math.BigDecimal;
 
 public record FarmerLedgerRow(
+        String transactionId,
         String transactionDate,
         String billNumber,
         String transactionType,

@@ -69,6 +69,7 @@ public class ReportService {
 
         StringBuilder sql = new StringBuilder("""
                 SELECT
+                    t.id::text,
                     t.transaction_date::text,
                     t.bill_number,
                     t.transaction_type,
@@ -106,8 +107,9 @@ public class ReportService {
                 str(r[0]),
                 str(r[1]),
                 str(r[2]),
-                decimal(r[3]),
+                str(r[3]),
                 decimal(r[4]),
+                decimal(r[5]),
                 BigDecimal.ZERO  // TODO: interest formula not confirmed by client
         )).toList();
     }

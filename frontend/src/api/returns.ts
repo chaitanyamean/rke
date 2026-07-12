@@ -55,3 +55,26 @@ export function useCreateReturn() {
       (await api.post<Transaction>('/api/returns', input)).data,
   })
 }
+
+/** Payload for correcting an existing return — original bill/farmer are not editable. */
+export interface ReturnUpdateInput {
+  returnDate: string
+  items: ReturnLineItemInput[]
+  remarks?: string
+}
+
+/** Fetches a single return by id — admin only (enforced server-side). */
+export function useReturn(id: string | null) {
+  return useQuery({
+    queryKey: ['return', id],
+    queryFn: async () => (await api.get<Transaction>(`/api/returns/${id}`)).data,
+    enabled: !!id,
+  })
+}
+
+export function useUpdateReturn() {
+  return useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: ReturnUpdateInput }) =>
+      (await api.put<Transaction>(`/api/returns/${id}`, input)).data,
+  })
+}

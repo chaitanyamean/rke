@@ -13,9 +13,13 @@ import ItemListPage from './pages/ItemListPage'
 import TenantListPage from './pages/admin/TenantListPage'
 import TenantFormPage from './pages/admin/TenantFormPage'
 import TenantFeaturesPage from './pages/admin/TenantFeaturesPage'
+import StaffUsersPage from './pages/admin/StaffUsersPage'
 import SalePage from './pages/SalePage'
+import SaleEditPage from './pages/SaleEditPage'
 import PaymentPage from './pages/PaymentPage'
+import PaymentEditPage from './pages/PaymentEditPage'
 import ReturnPage from './pages/ReturnPage'
+import ReturnEditPage from './pages/ReturnEditPage'
 import CottonLotPage from './pages/CottonLotPage'
 import ReportsLandingPage from './pages/reports/ReportsLandingPage'
 import FarmerLedgerPage from './pages/reports/FarmerLedgerPage'
@@ -57,6 +61,14 @@ export default function App() {
             <Route path="/item-categories" element={<ItemCategoriesPage />} />
             <Route path="/bill-number-types" element={<BillNumberTypesPage />} />
             <Route path="/items/new" element={<ItemRegistrationPage />} />
+            <Route path="/staff-users" element={<StaffUsersPage />} />
+
+            {/* Transaction edits — corrections only, restricted to admin. */}
+            <Route path="/sales/cash/:id/edit" element={<SaleEditPage saleType="cash" />} />
+            <Route path="/sales/credit/:id/edit" element={<SaleEditPage saleType="credit" />} />
+            <Route path="/payments/payment/:id/edit" element={<PaymentEditPage direction="payment" />} />
+            <Route path="/payments/receipt/:id/edit" element={<PaymentEditPage direction="receipt" />} />
+            <Route path="/returns/:id/edit" element={<ReturnEditPage />} />
           </Route>
 
           {/* Super admin only */}

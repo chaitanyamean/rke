@@ -3,6 +3,8 @@ package com.rke.backend.service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -20,8 +22,10 @@ import com.rke.backend.domain.enums.TransactionStatus;
 import com.rke.backend.domain.enums.TransactionType;
 import com.rke.backend.dto.SaleLineItemRequest;
 import com.rke.backend.dto.SaleRequest;
+import com.rke.backend.dto.SaleUpdateRequest;
 import com.rke.backend.dto.TransactionItemResponse;
 import com.rke.backend.dto.TransactionResponse;
+import com.rke.backend.exception.NotFoundException;
 import com.rke.backend.repository.BillNumberSequenceRepository;
 import com.rke.backend.repository.BillNumberTypeRepository;
 import com.rke.backend.repository.FarmerRepository;
@@ -138,6 +142,105 @@ public class SalesService {
                 .toList();
 
         return TransactionResponse.from(tx, itemResponses);
+    }
+
+    /**
+     * Corrects an existing cash/credit sale: farmer, date, line items, and
+     * remarks. Bill number and sale type are fixed (see {@link SaleUpdateRequest}
+     * javadoc) — this is a correction path, not a way to convert one kind of
+     * transaction into another.
+     *
+     * <p>Restricted to ADMIN via {@code @PreAuthorize} on {@link com.rke.backend.controller.SaleController}.
+     *
+     * <p>Line items are replaced wholesale (delete + re-insert) rather than
+     * diffed, mirroring how {@link #createSale} builds them. The pre-edit
+     * transaction snapshot — including its original line items — is captured in
+     * {@code old_values} before anything is touched, so the audit trail always
+     * has the true prior state, not just the header fields.
+     *
+     * <p>A voided sale cannot be edited; void first requires un-voiding (not
+     * supported) or the correction should be made as a fresh transaction.
+     */
+    @Transactional
+    public TransactionResponse updateSale(UUID id, SaleUpdateRequest request, TransactionType expectedType) {
+        Transaction tx = requireOwned(id);
+
+        if (tx.getTransactionType() != expectedType) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction " + id + " is not a " + expectedType);
+        }
+        if (tx.getStatus() != TransactionStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot edit a voided transaction");
+        }
+
+        farmerRepository.findById(request.farmerId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Farmer not found: " + request.farmerId()));
+
+        List<PricedLine> lines = validateAndPriceLines(request.items(), expectedType);
+        BigDecimal grandTotal = lines.stream()
+                .map(PricedLine::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Snapshot the full prior state — header + line items — before mutating.
+        Map<String, Object> before = auditService.snapshot(tx);
+        List<TransactionItem> priorItems = transactionItemRepository.findByTransactionId(tx.getId());
+        before.put("items", priorItems.stream().map(TransactionItemResponse::from).toList());
+
+        tx.setFarmerId(request.farmerId());
+        tx.setTransactionDate(request.transactionDate());
+        tx.setGrandTotal(grandTotal);
+        tx.setRemarks(request.remarks());
+        tx = transactionRepository.save(tx);
+
+        transactionItemRepository.deleteByTransactionId(tx.getId());
+        List<TransactionItem> savedItems = new ArrayList<>(lines.size());
+        for (PricedLine line : lines) {
+            TransactionItem item = TransactionItem.builder()
+                    .tenantId(tx.getTenantId())
+                    .transactionId(tx.getId())
+                    .itemId(line.itemId())
+                    .quantity(line.quantity())
+                    .price(line.price())
+                    .amount(line.amount())
+                    .build();
+            savedItems.add(transactionItemRepository.save(item));
+        }
+
+        Map<String, Object> after = auditService.snapshot(tx);
+        after.put("items", savedItems.stream().map(TransactionItemResponse::from).toList());
+        auditService.record("transactions", tx.getId(), AuditAction.UPDATE, before, after);
+
+        List<TransactionItemResponse> itemResponses = savedItems.stream()
+                .map(TransactionItemResponse::from)
+                .toList();
+        return TransactionResponse.from(tx, itemResponses);
+    }
+
+    /** Fetches a transaction and confirms it belongs to the current tenant. */
+    private Transaction requireOwned(UUID id) {
+        Transaction tx = transactionRepository.findById(id)
+                .orElseThrow(() -> NotFoundException.of("Transaction", id));
+        if (!Objects.equals(tx.getTenantId(), currentUserService.getTenantId())) {
+            throw NotFoundException.of("Transaction", id);
+        }
+        return tx;
+    }
+
+    /** Fetches a single cash/credit sale by id — used to prefill the edit form. */
+    @Transactional(readOnly = true)
+    public TransactionResponse getSale(UUID id, TransactionType expectedType) {
+        Transaction tx = requireOwned(id);
+        if (tx.getTransactionType() != expectedType) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction " + id + " is not a " + expectedType);
+        }
+        List<TransactionItemResponse> items = transactionItemRepository
+                .findByTransactionId(tx.getId()).stream()
+                .map(TransactionItemResponse::from)
+                .toList();
+        return TransactionResponse.from(tx, items);
     }
 
     /**

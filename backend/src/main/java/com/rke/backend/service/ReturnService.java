@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -22,8 +23,10 @@ import com.rke.backend.dto.OriginalSaleItemResponse;
 import com.rke.backend.dto.OriginalSaleResponse;
 import com.rke.backend.dto.ReturnLineItemRequest;
 import com.rke.backend.dto.ReturnRequest;
+import com.rke.backend.dto.ReturnUpdateRequest;
 import com.rke.backend.dto.TransactionItemResponse;
 import com.rke.backend.dto.TransactionResponse;
+import com.rke.backend.exception.NotFoundException;
 import com.rke.backend.repository.TransactionItemRepository;
 import com.rke.backend.repository.TransactionRepository;
 import com.rke.backend.security.CurrentUserService;
@@ -86,8 +89,22 @@ public class ReturnService {
      * voiding a return frees up its quantity for a fresh return.
      */
     private Map<UUID, BigDecimal> alreadyReturnedQuantities(String originalBillNumber) {
+        return alreadyReturnedQuantities(originalBillNumber, null);
+    }
+
+    /**
+     * Same as {@link #alreadyReturnedQuantities(String)}, but excludes
+     * {@code excludingReturnId} from the sum. Used when editing an existing
+     * return: its own current lines must not count against themselves when
+     * re-validating the new requested quantities, otherwise re-saving the exact
+     * same quantities would look like double-returning.
+     */
+    private Map<UUID, BigDecimal> alreadyReturnedQuantities(String originalBillNumber, UUID excludingReturnId) {
         List<Transaction> priorReturns = transactionRepository
-                .findByOriginalBillNumberAndStatus(originalBillNumber, TransactionStatus.ACTIVE);
+                .findByOriginalBillNumberAndStatus(originalBillNumber, TransactionStatus.ACTIVE)
+                .stream()
+                .filter(t -> !t.getId().equals(excludingReturnId))
+                .toList();
         if (priorReturns.isEmpty()) {
             return Map.of();
         }
@@ -216,6 +233,122 @@ public class ReturnService {
                 .map(TransactionItemResponse::from)
                 .toList();
         return TransactionResponse.from(returnTx, itemResponses);
+    }
+
+    /**
+     * Corrects an existing return's date, line items, and remarks. The original
+     * bill number and farmer are fixed — see {@link ReturnUpdateRequest} javadoc.
+     *
+     * <p>Restricted to ADMIN via {@code @PreAuthorize} on {@link com.rke.backend.controller.ReturnController}.
+     * Cumulative-return validation excludes this return's own current lines
+     * (via {@link #alreadyReturnedQuantities(String, UUID)}) so re-saving the
+     * same or adjusted quantities is validated against the original sale minus
+     * *other* returns only, not against itself.
+     */
+    @Transactional
+    public TransactionResponse updateReturn(UUID id, ReturnUpdateRequest request) {
+        Transaction returnTx = requireOwnedReturn(id);
+
+        if (returnTx.getStatus() != TransactionStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot edit a voided transaction");
+        }
+
+        String originalBillNumber = returnTx.getOriginalBillNumber();
+        Transaction original = requireSale(originalBillNumber);
+
+        Map<UUID, TransactionItem> originalItemMap = transactionItemRepository
+                .findByTransactionId(original.getId())
+                .stream()
+                .collect(Collectors.toMap(TransactionItem::getItemId, Function.identity()));
+
+        Map<UUID, BigDecimal> alreadyReturned =
+                alreadyReturnedQuantities(originalBillNumber, returnTx.getId());
+
+        record ReturnLine(UUID itemId, BigDecimal quantity, BigDecimal price, BigDecimal amount) {}
+        List<ReturnLine> lines = new ArrayList<>(request.items().size());
+
+        for (ReturnLineItemRequest req : request.items()) {
+            TransactionItem orig = originalItemMap.get(req.itemId());
+            if (orig == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Item " + req.itemId() + " was not in original transaction " + originalBillNumber);
+            }
+            BigDecimal returnedSoFar = alreadyReturned.getOrDefault(req.itemId(), BigDecimal.ZERO);
+            BigDecimal totalAfterThisReturn = returnedSoFar.add(req.quantity());
+            if (totalAfterThisReturn.compareTo(orig.getQuantity()) > 0) {
+                BigDecimal remaining = orig.getQuantity().subtract(returnedSoFar).max(BigDecimal.ZERO);
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Return quantity " + req.quantity() + " for item " + req.itemId()
+                                + " exceeds the remaining returnable quantity " + remaining
+                                + " (originally sold " + orig.getQuantity()
+                                + ", already returned by other returns " + returnedSoFar + ")");
+            }
+            BigDecimal amount = req.quantity().multiply(orig.getPrice()).negate();
+            lines.add(new ReturnLine(req.itemId(), req.quantity(), orig.getPrice(), amount));
+        }
+
+        BigDecimal grandTotal = lines.stream()
+                .map(ReturnLine::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Snapshot the full prior state — header + line items — before mutating.
+        Map<String, Object> before = auditService.snapshot(returnTx);
+        List<TransactionItem> priorItems = transactionItemRepository.findByTransactionId(returnTx.getId());
+        before.put("items", priorItems.stream().map(TransactionItemResponse::from).toList());
+
+        returnTx.setTransactionDate(request.returnDate());
+        returnTx.setGrandTotal(grandTotal);
+        returnTx.setRemarks(request.remarks());
+        returnTx = transactionRepository.save(returnTx);
+
+        transactionItemRepository.deleteByTransactionId(returnTx.getId());
+        List<TransactionItem> savedItems = new ArrayList<>(lines.size());
+        for (ReturnLine line : lines) {
+            TransactionItem item = TransactionItem.builder()
+                    .tenantId(returnTx.getTenantId())
+                    .transactionId(returnTx.getId())
+                    .itemId(line.itemId())
+                    .quantity(line.quantity())
+                    .price(line.price())
+                    .amount(line.amount())
+                    .build();
+            savedItems.add(transactionItemRepository.save(item));
+        }
+
+        Map<String, Object> after = auditService.snapshot(returnTx);
+        after.put("items", savedItems.stream().map(TransactionItemResponse::from).toList());
+        auditService.record("transactions", returnTx.getId(), AuditAction.UPDATE, before, after);
+
+        List<TransactionItemResponse> itemResponses = savedItems.stream()
+                .map(TransactionItemResponse::from)
+                .toList();
+        return TransactionResponse.from(returnTx, itemResponses);
+    }
+
+    /** Fetches a RETURN transaction owned by the current tenant. */
+    private Transaction requireOwnedReturn(UUID id) {
+        Transaction tx = transactionRepository.findById(id)
+                .orElseThrow(() -> NotFoundException.of("Transaction", id));
+        if (!Objects.equals(tx.getTenantId(), currentUserService.getTenantId())) {
+            throw NotFoundException.of("Transaction", id);
+        }
+        if (tx.getTransactionType() != TransactionType.RETURN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction " + id + " is not a RETURN");
+        }
+        return tx;
+    }
+
+    /** Fetches a single return by id — used to prefill the edit form. */
+    @Transactional(readOnly = true)
+    public TransactionResponse getReturn(UUID id) {
+        Transaction tx = requireOwnedReturn(id);
+        List<TransactionItemResponse> items = transactionItemRepository
+                .findByTransactionId(tx.getId()).stream()
+                .map(TransactionItemResponse::from)
+                .toList();
+        return TransactionResponse.from(tx, items);
     }
 
     // -------------------------------------------------------------------------

@@ -16,4 +16,13 @@ public interface StaffUserRepository extends JpaRepository<StaffUser, UUID> {
      * tenants; the caller disambiguates.
      */
     List<StaffUser> findByUsername(String username);
+
+    /**
+     * Lists staff users for the admin-facing staff management screen. Relies on
+     * the Hibernate tenant filter (enabled automatically for the current
+     * request's tenant) to scope results — a bare {@code tenant_id = :tenantId}
+     * condition also naturally excludes super_admin rows, whose tenant_id is
+     * always NULL.
+     */
+    List<StaffUser> findAllByOrderByUsernameAsc();
 }

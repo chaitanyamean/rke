@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.rke.backend.domain.Transaction;
 import com.rke.backend.domain.enums.TransactionType;
 import com.rke.backend.dto.SaleRequest;
+import com.rke.backend.dto.SaleUpdateRequest;
 import com.rke.backend.dto.TransactionItemResponse;
 import com.rke.backend.dto.TransactionResponse;
 import com.rke.backend.repository.TransactionItemRepository;
@@ -23,6 +26,12 @@ import com.rke.backend.service.SalesService;
 
 import jakarta.validation.Valid;
 
+/**
+ * Cash/credit sale creation is open to STAFF and ADMIN; editing an existing
+ * sale is ADMIN-only (see {@code @PreAuthorize} on the PUT endpoints) —
+ * enforced here at the controller boundary, which is the real security
+ * boundary regardless of what the frontend shows or hides.
+ */
 @RestController
 @RequestMapping("/api/sales")
 public class SaleController {
@@ -49,6 +58,32 @@ public class SaleController {
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponse createCreditSale(@Valid @RequestBody SaleRequest request) {
         return salesService.createSale(request, TransactionType.CREDIT_SALE);
+    }
+
+    @GetMapping("/cash/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public TransactionResponse getCashSale(@PathVariable UUID id) {
+        return salesService.getSale(id, TransactionType.CASH_SALE);
+    }
+
+    @GetMapping("/credit/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public TransactionResponse getCreditSale(@PathVariable UUID id) {
+        return salesService.getSale(id, TransactionType.CREDIT_SALE);
+    }
+
+    @PutMapping("/cash/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public TransactionResponse updateCashSale(@PathVariable UUID id,
+                                               @Valid @RequestBody SaleUpdateRequest request) {
+        return salesService.updateSale(id, request, TransactionType.CASH_SALE);
+    }
+
+    @PutMapping("/credit/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public TransactionResponse updateCreditSale(@PathVariable UUID id,
+                                                 @Valid @RequestBody SaleUpdateRequest request) {
+        return salesService.updateSale(id, request, TransactionType.CREDIT_SALE);
     }
 
     @GetMapping("/farmer/{farmerId}")

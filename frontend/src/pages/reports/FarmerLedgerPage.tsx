@@ -1,8 +1,28 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { Farmer } from '../../types'
 import { useFarmerLedger, type DateRangeFilter } from '../../api/reports'
+import { useAuth } from '../../auth/AuthContext'
 import FarmerSelector from '../../components/FarmerSelector'
 import ReportShell from '../../components/ReportShell'
+
+/** Maps a ledger row's transaction_type token to its admin-only edit route. */
+function editPathFor(transactionType: string, transactionId: string): string | null {
+  switch (transactionType) {
+    case 'cash_sale':
+      return `/sales/cash/${transactionId}/edit`
+    case 'credit_sale':
+      return `/sales/credit/${transactionId}/edit`
+    case 'cash_payment':
+      return `/payments/payment/${transactionId}/edit`
+    case 'cash_receipt':
+      return `/payments/receipt/${transactionId}/edit`
+    case 'return':
+      return `/returns/${transactionId}/edit`
+    default:
+      return null
+  }
+}
 
 function fmtType(t: string) {
   return t.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
@@ -13,6 +33,7 @@ function fmtCcy(n: number) {
 }
 
 export default function FarmerLedgerPage() {
+  const { isAdmin } = useAuth()
   const [farmer, setFarmer] = useState<Farmer | null>(null)
   const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '', toDate: '', includeVoided: false })
   const [active, setActive] = useState<(DateRangeFilter & { farmerId: string }) | null>(null)
@@ -66,15 +87,18 @@ export default function FarmerLedgerPage() {
           <table className="w-full min-w-[700px] text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Bill Number', 'Type', 'Amount (₹)', 'Balance (₹)', 'Interest (₹)'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
-                ))}
+                {['Date', 'Bill Number', 'Type', 'Amount (₹)', 'Balance (₹)', 'Interest (₹)']
+                  .concat(isAdmin ? [''] : [])
+                  .map((h, i) => (
+                    <th key={i} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                  ))}
               </tr>
             </thead>
             <tbody>
               {data.map((row, i) => {
                 const isDebit = row.transactionType === 'credit_sale'
                 const isCredit = ['cash_payment', 'cash_receipt', 'return'].includes(row.transactionType)
+                const editPath = isAdmin ? editPathFor(row.transactionType, row.transactionId) : null
                 return (
                   <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2.5 text-slate-600">{row.transactionDate}</td>
@@ -95,6 +119,15 @@ export default function FarmerLedgerPage() {
                       {fmtCcy(row.runningBalance)}
                     </td>
                     <td className="px-4 py-2.5 text-right text-slate-400">{fmtCcy(row.interestAmount)}</td>
+                    {isAdmin && (
+                      <td className="px-4 py-2.5 text-right">
+                        {editPath && (
+                          <Link to={editPath} className="text-xs font-medium text-blue-600 hover:underline">
+                            Edit
+                          </Link>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -106,6 +139,7 @@ export default function FarmerLedgerPage() {
                   ₹{fmtCcy(data[data.length - 1].runningBalance)}
                 </td>
                 <td />
+                {isAdmin && <td />}
               </tr>
             </tfoot>
           </table>

@@ -2,6 +2,8 @@ package com.rke.backend.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,7 +17,9 @@ import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.TransactionStatus;
 import com.rke.backend.domain.enums.TransactionType;
 import com.rke.backend.dto.PaymentRequest;
+import com.rke.backend.dto.PaymentUpdateRequest;
 import com.rke.backend.dto.TransactionResponse;
+import com.rke.backend.exception.NotFoundException;
 import com.rke.backend.repository.BillNumberTypeRepository;
 import com.rke.backend.repository.FarmerRepository;
 import com.rke.backend.repository.TransactionRepository;
@@ -87,6 +91,67 @@ public class PaymentService {
         auditService.record("transactions", tx.getId(), AuditAction.INSERT, null,
                 auditService.snapshot(tx));
 
+        return TransactionResponse.from(tx, List.of());
+    }
+
+    /**
+     * Corrects an existing payment/receipt: farmer, date, amount, and remarks.
+     * Bill number and payment direction (payment vs receipt) are fixed — see
+     * {@link PaymentUpdateRequest} javadoc.
+     *
+     * <p>Restricted to ADMIN via {@code @PreAuthorize} on {@link com.rke.backend.controller.PaymentController}.
+     * The pre-edit snapshot is captured before any field is mutated so
+     * {@code old_values} in the audit trail reflects the true prior state.
+     */
+    @Transactional
+    public TransactionResponse updatePayment(UUID id, PaymentUpdateRequest request, TransactionType expectedType) {
+        Transaction tx = requireOwned(id);
+
+        if (tx.getTransactionType() != expectedType) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction " + id + " is not a " + expectedType);
+        }
+        if (tx.getStatus() != TransactionStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot edit a voided transaction");
+        }
+
+        farmerRepository.findById(request.farmerId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Farmer not found: " + request.farmerId()));
+
+        Map<String, Object> before = auditService.snapshot(tx);
+
+        tx.setFarmerId(request.farmerId());
+        tx.setTransactionDate(request.transactionDate());
+        tx.setGrandTotal(request.amount());
+        tx.setRemarks(request.remarks());
+        tx = transactionRepository.save(tx);
+
+        auditService.record("transactions", tx.getId(), AuditAction.UPDATE,
+                before, auditService.snapshot(tx));
+
+        return TransactionResponse.from(tx, List.of());
+    }
+
+    /** Fetches a transaction and confirms it belongs to the current tenant. */
+    private Transaction requireOwned(UUID id) {
+        Transaction tx = transactionRepository.findById(id)
+                .orElseThrow(() -> NotFoundException.of("Transaction", id));
+        if (!Objects.equals(tx.getTenantId(), currentUserService.getTenantId())) {
+            throw NotFoundException.of("Transaction", id);
+        }
+        return tx;
+    }
+
+    /** Fetches a single payment/receipt by id — used to prefill the edit form. */
+    @Transactional(readOnly = true)
+    public TransactionResponse getPayment(UUID id, TransactionType expectedType) {
+        Transaction tx = requireOwned(id);
+        if (tx.getTransactionType() != expectedType) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction " + id + " is not a " + expectedType);
+        }
         return TransactionResponse.from(tx, List.of());
     }
 
