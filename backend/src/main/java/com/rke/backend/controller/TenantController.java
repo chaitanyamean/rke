@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.rke.backend.dto.TenantCreateRequest;
+import com.rke.backend.dto.TenantCreateResponse;
 import com.rke.backend.dto.TenantRequest;
 import com.rke.backend.dto.TenantResponse;
 import com.rke.backend.service.TenantService;
@@ -51,9 +53,14 @@ public class TenantController {
         return tenantService.getById(id);
     }
 
+    /**
+     * Creates a new tenant together with its first admin login, in one atomic
+     * step. This is the only way (besides Flyway seed data) a tenant becomes
+     * usable — without an admin login there would be no way to sign into it.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TenantResponse create(@Valid @RequestBody TenantRequest request) {
+    public TenantCreateResponse create(@Valid @RequestBody TenantCreateRequest request) {
         return tenantService.create(request);
     }
 

@@ -1,17 +1,26 @@
 package com.rke.backend.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.rke.backend.domain.StaffUser;
 import com.rke.backend.domain.Tenant;
 import com.rke.backend.domain.enums.AuditAction;
+import com.rke.backend.domain.enums.StaffRole;
+import com.rke.backend.dto.TenantCreateRequest;
+import com.rke.backend.dto.TenantCreateResponse;
 import com.rke.backend.dto.TenantRequest;
 import com.rke.backend.dto.TenantResponse;
 import com.rke.backend.exception.NotFoundException;
+import com.rke.backend.repository.StaffUserRepository;
 import com.rke.backend.repository.TenantRepository;
 import com.rke.backend.security.CurrentUserService;
 import com.rke.backend.security.TenantContextFilter;
@@ -22,18 +31,24 @@ import jakarta.servlet.http.HttpSession;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final StaffUserRepository staffUserRepository;
     private final StorageService storageService;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
+    private final PasswordEncoder passwordEncoder;
 
     public TenantService(TenantRepository tenantRepository,
+                         StaffUserRepository staffUserRepository,
                          StorageService storageService,
                          AuditService auditService,
-                         CurrentUserService currentUserService) {
+                         CurrentUserService currentUserService,
+                         PasswordEncoder passwordEncoder) {
         this.tenantRepository = tenantRepository;
+        this.staffUserRepository = staffUserRepository;
         this.storageService = storageService;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional(readOnly = true)
@@ -61,8 +76,25 @@ public class TenantService {
         return TenantResponse.from(require(tenantId));
     }
 
+    /**
+     * Creates a tenant and its first admin login atomically. Without this, a
+     * newly created tenant would have no way to sign in — only RK Enterprises'
+     * seeded {@code staff_users} row (via Flyway) exists otherwise.
+     *
+     * <p>The admin username only needs to be unique within the brand-new tenant,
+     * which is trivially true since it has no other users yet — but the check is
+     * still performed via {@link #requireUniqueUsername} to share the same
+     * validation path used everywhere else usernames are assigned, and to guard
+     * against the (currently impossible, but future-proofed) case of retrying
+     * this call against an existing tenant id.
+     *
+     * <p>The plaintext password is never persisted or logged: only its bcrypt
+     * hash is stored on the {@code StaffUser} row, and the audit snapshot for
+     * the new user explicitly omits the password fields (see
+     * {@link #adminAuditSnapshot}).
+     */
     @Transactional
-    public TenantResponse create(TenantRequest request) {
+    public TenantCreateResponse create(TenantCreateRequest request) {
         Tenant tenant = Tenant.builder()
                 .name(request.name().trim())
                 .slug(request.slug().trim())
@@ -70,8 +102,56 @@ public class TenantService {
                 .active(request.active())
                 .build();
         tenant = tenantRepository.save(tenant);
-        // Audit logged via standard application log (no tenant context for creation).
-        return TenantResponse.from(tenant);
+
+        String username = request.adminUsername().trim();
+        requireUniqueUsername(tenant.getId(), username);
+
+        StaffUser admin = StaffUser.builder()
+                .tenantId(tenant.getId())
+                .username(username)
+                .passwordHash(passwordEncoder.encode(request.adminPassword()))
+                .fullName(request.adminFullName().trim())
+                .role(StaffRole.ADMIN)
+                .active(true)
+                .build();
+        admin = staffUserRepository.save(admin);
+
+        auditService.recordForTenant(tenant.getId(), "tenants", tenant.getId(),
+                AuditAction.INSERT, null, auditService.snapshot(tenant));
+        auditService.recordForTenant(tenant.getId(), "staff_users", admin.getId(),
+                AuditAction.INSERT, null, adminAuditSnapshot(admin));
+
+        return TenantCreateResponse.of(TenantResponse.from(tenant), admin.getUsername());
+    }
+
+    /**
+     * Same uniqueness rule enforced at login time (username unique per tenant),
+     * checked proactively here so a duplicate produces a clean 409 instead of
+     * relying solely on the DB's unique index to reject the insert.
+     */
+    private void requireUniqueUsername(UUID tenantId, String username) {
+        boolean exists = staffUserRepository.findByUsername(username).stream()
+                .anyMatch(u -> tenantId.equals(u.getTenantId()));
+        if (exists) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Username already exists for this tenant: " + username);
+        }
+    }
+
+    /**
+     * Audit snapshot for a newly created StaffUser that deliberately excludes
+     * the password hash — audit_log must never carry credential material, even
+     * hashed, since it's readable by anyone with audit access.
+     */
+    private static Map<String, Object> adminAuditSnapshot(StaffUser admin) {
+        Map<String, Object> snapshot = new java.util.HashMap<>();
+        snapshot.put("id", admin.getId());
+        snapshot.put("tenantId", admin.getTenantId());
+        snapshot.put("username", admin.getUsername());
+        snapshot.put("fullName", admin.getFullName());
+        snapshot.put("role", admin.getRole());
+        snapshot.put("active", admin.isActive());
+        return snapshot;
     }
 
     @Transactional

@@ -12,6 +12,20 @@ export interface TenantInput {
   active: boolean
 }
 
+/** Payload for creating a brand-new tenant plus its first admin login in one step. */
+export interface TenantCreateInput extends TenantInput {
+  adminFullName: string
+  adminUsername: string
+  adminPassword: string
+}
+
+/** Response from tenant creation — never carries the admin password or its hash. */
+export interface TenantCreateResult {
+  tenant: Tenant
+  adminCreated: boolean
+  adminUsername: string
+}
+
 // ── Tenant CRUD (super_admin) ────────────────────────────────────────────────
 
 export function useTenants() {
@@ -29,11 +43,12 @@ export function useTenant(id: string) {
   })
 }
 
+/** Creates a tenant together with its first admin login, in one atomic step. */
 export function useCreateTenant() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: TenantInput) =>
-      (await api.post<Tenant>('/api/admin/tenants', input)).data,
+    mutationFn: async (input: TenantCreateInput) =>
+      (await api.post<TenantCreateResult>('/api/admin/tenants', input)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 }

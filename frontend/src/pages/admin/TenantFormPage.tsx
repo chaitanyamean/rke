@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTenant, useCreateTenant, useUpdateTenant, useUploadLogo } from '../../api/tenants'
 import { getErrorMessage } from '../../lib/api'
 
+const MIN_PASSWORD_LENGTH = 8
+
 export default function TenantFormPage() {
   const { id } = useParams<{ id?: string }>()
   const isEdit = Boolean(id)
@@ -22,6 +24,16 @@ export default function TenantFormPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Initial admin login — only collected when creating a new tenant.
+  const [adminFullName, setAdminFullName] = useState('')
+  const [adminUsername, setAdminUsername] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+
+  // Post-create confirmation — shown instead of navigating away immediately,
+  // since the password is never shown again after this.
+  const [created, setCreated] = useState<{ name: string; slug: string; adminUsername: string } | null>(null)
 
   // Populate form when editing.
   useEffect(() => {
@@ -55,20 +67,53 @@ export default function TenantFormPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // Client-side validation mirrors the backend rules, but the backend
+    // re-validates independently — this is just for a fast, friendly error.
+    if (!isEdit) {
+      if (!adminFullName.trim() || !adminUsername.trim() || !adminPassword) {
+        setError('Full name, username, and password are required for the initial admin login.')
+        return
+      }
+      if (adminPassword.length < MIN_PASSWORD_LENGTH) {
+        setError(`Admin password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+        return
+      }
+    }
+
     setSubmitting(true)
-
     try {
-      const input = { name, slug, primaryColor: primaryColor || undefined, active }
-
       let savedId = id
+
       if (isEdit && id) {
+        const input = { name, slug, primaryColor: primaryColor || undefined, active }
         await update.mutateAsync({ id, input })
       } else {
-        const created = await create.mutateAsync(input)
-        savedId = created.id
+        const input = {
+          name,
+          slug,
+          primaryColor: primaryColor || undefined,
+          active,
+          adminFullName: adminFullName.trim(),
+          adminUsername: adminUsername.trim(),
+          adminPassword,
+        }
+        const result = await create.mutateAsync(input)
+        savedId = result.tenant.id
+
+        // Upload logo separately if a file was chosen.
+        if (logoFile && savedId) {
+          await uploadLogo.mutateAsync({ id: savedId, file: logoFile })
+        }
+
+        // Show the confirmation screen instead of navigating away — the
+        // password is never shown again after this point.
+        setCreated({ name: result.tenant.name, slug: result.tenant.slug, adminUsername: result.adminUsername })
+        setSubmitting(false)
+        return
       }
 
-      // Upload logo separately if a file was chosen.
+      // Upload logo separately if a file was chosen (edit path).
       if (logoFile && savedId) {
         await uploadLogo.mutateAsync({ id: savedId, file: logoFile })
       }
@@ -79,6 +124,40 @@ export default function TenantFormPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // ── Post-create confirmation ─────────────────────────────────────────────
+  if (created) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-8 text-center shadow">
+          <div className="mb-2 text-4xl">✓</div>
+          <h2 className="mb-1 text-xl font-bold text-green-800">Tenant Created</h2>
+          <p className="mb-4 text-sm text-green-700">
+            <span className="font-semibold">{created.name}</span>{' '}
+            <span className="font-mono text-green-600">({created.slug})</span> is ready to use.
+          </p>
+
+          <div className="mx-auto mb-4 max-w-xs rounded-lg border border-slate-200 bg-white p-4 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Admin Username
+            </p>
+            <p className="mb-3 font-mono text-sm text-slate-800">{created.adminUsername}</p>
+            <p className="text-xs text-amber-700">
+              Share these credentials with the client through a secure channel — the
+              password you set won't be shown again.
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate('/admin/tenants')}
+            className="rounded-md bg-green-700 px-6 py-2 text-white hover:bg-green-800"
+          >
+            Back to Tenants
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -186,6 +265,76 @@ export default function TenantFormPage() {
             </p>
           )}
         </div>
+
+        {/* Initial admin login — only collected when creating a new tenant. */}
+        {!isEdit && (
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Initial Admin Login
+            </h2>
+            <p className="text-xs text-slate-500">
+              This creates the first login for this tenant. The client can change
+              the password after they sign in.
+            </p>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Full Name <span className="text-red-500">*</span>
+              </span>
+              <input
+                id="tenant-admin-full-name"
+                name="adminFullName"
+                value={adminFullName}
+                onChange={(e) => setAdminFullName(e.target.value)}
+                required
+                className="w-full rounded-md border border-slate-300 px-3 py-2"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Username <span className="text-red-500">*</span>
+              </span>
+              <input
+                id="tenant-admin-username"
+                name="adminUsername"
+                value={adminUsername}
+                onChange={(e) => setAdminUsername(e.target.value)}
+                required
+                className="w-full rounded-md border border-slate-300 px-3 py-2"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Password <span className="text-red-500">*</span>
+                <span className="ml-1 text-xs font-normal text-slate-400">
+                  (min {MIN_PASSWORD_LENGTH} characters)
+                </span>
+              </span>
+              <div className="flex gap-2">
+                <input
+                  id="tenant-admin-password"
+                  name="adminPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                  autoComplete="new-password"
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </label>
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
