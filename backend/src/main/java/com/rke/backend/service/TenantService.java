@@ -11,8 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.rke.backend.domain.CottonLotSequence;
 import com.rke.backend.domain.StaffUser;
 import com.rke.backend.domain.Tenant;
+import com.rke.backend.domain.TransactionNoSequence;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.StaffRole;
 import com.rke.backend.dto.TenantCreateRequest;
@@ -20,8 +22,10 @@ import com.rke.backend.dto.TenantCreateResponse;
 import com.rke.backend.dto.TenantRequest;
 import com.rke.backend.dto.TenantResponse;
 import com.rke.backend.exception.NotFoundException;
+import com.rke.backend.repository.CottonLotSequenceRepository;
 import com.rke.backend.repository.StaffUserRepository;
 import com.rke.backend.repository.TenantRepository;
+import com.rke.backend.repository.TransactionNoSequenceRepository;
 import com.rke.backend.security.CurrentUserService;
 import com.rke.backend.security.TenantContextFilter;
 
@@ -36,19 +40,25 @@ public class TenantService {
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
     private final PasswordEncoder passwordEncoder;
+    private final CottonLotSequenceRepository cottonLotSequenceRepository;
+    private final TransactionNoSequenceRepository transactionNoSequenceRepository;
 
     public TenantService(TenantRepository tenantRepository,
                          StaffUserRepository staffUserRepository,
                          StorageService storageService,
                          AuditService auditService,
                          CurrentUserService currentUserService,
-                         PasswordEncoder passwordEncoder) {
+                         PasswordEncoder passwordEncoder,
+                         CottonLotSequenceRepository cottonLotSequenceRepository,
+                         TransactionNoSequenceRepository transactionNoSequenceRepository) {
         this.tenantRepository = tenantRepository;
         this.staffUserRepository = staffUserRepository;
         this.storageService = storageService;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
         this.passwordEncoder = passwordEncoder;
+        this.cottonLotSequenceRepository = cottonLotSequenceRepository;
+        this.transactionNoSequenceRepository = transactionNoSequenceRepository;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +130,22 @@ public class TenantService {
                 AuditAction.INSERT, null, auditService.snapshot(tenant));
         auditService.recordForTenant(tenant.getId(), "staff_users", admin.getId(),
                 AuditAction.INSERT, null, adminAuditSnapshot(admin));
+
+        // Provision the per-tenant sequence rows so the new tenant can immediately
+        // start creating transactions, cotton lots, etc. without manual DB seeding.
+        // bill_number_sequences are per-category and created when categories are added.
+        cottonLotSequenceRepository.save(CottonLotSequence.builder()
+                .tenantId(tenant.getId())
+                .currentSequence(0)
+                .prefix("CTNL")
+                .paddingWidth(4)
+                .formatTemplate("{PREFIX}-{SEQ}")
+                .build());
+
+        transactionNoSequenceRepository.save(TransactionNoSequence.builder()
+                .tenantId(tenant.getId())
+                .currentSequence(0)
+                .build());
 
         return TenantCreateResponse.of(TenantResponse.from(tenant), admin.getUsername());
     }

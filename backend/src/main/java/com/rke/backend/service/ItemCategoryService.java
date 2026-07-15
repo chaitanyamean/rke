@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.rke.backend.domain.BillNumberSequence;
 import com.rke.backend.domain.ItemCategory;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.dto.ItemCategoryRequest;
 import com.rke.backend.exception.NotFoundException;
+import com.rke.backend.repository.BillNumberSequenceRepository;
 import com.rke.backend.repository.ItemCategoryRepository;
 import com.rke.backend.security.CurrentUserService;
 
@@ -19,12 +21,16 @@ import com.rke.backend.security.CurrentUserService;
 public class ItemCategoryService {
 
     private final ItemCategoryRepository repository;
+    private final BillNumberSequenceRepository billNumberSequenceRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
 
-    public ItemCategoryService(ItemCategoryRepository repository, AuditService auditService,
+    public ItemCategoryService(ItemCategoryRepository repository,
+                               BillNumberSequenceRepository billNumberSequenceRepository,
+                               AuditService auditService,
                                CurrentUserService currentUserService) {
         this.repository = repository;
+        this.billNumberSequenceRepository = billNumberSequenceRepository;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
     }
@@ -49,14 +55,27 @@ public class ItemCategoryService {
 
     @Transactional
     public ItemCategory create(ItemCategoryRequest request) {
+        UUID tenantId = currentUserService.getTenantId();
         ItemCategory category = ItemCategory.builder()
-                .tenantId(currentUserService.getTenantId())
+                .tenantId(tenantId)
                 .name(request.name().trim())
                 .description(trimToNull(request.description()))
                 .build();
         category = repository.save(category);
         auditService.record("item_categories", category.getId(), AuditAction.INSERT,
                 null, auditService.snapshot(category));
+
+        // Provision a bill_number_sequences row for this category so bill numbers
+        // can be auto-generated immediately without manual DB seeding.
+        billNumberSequenceRepository.save(BillNumberSequence.builder()
+                .tenantId(tenantId)
+                .itemCategoryId(category.getId())
+                .currentSequence(0)
+                .prefix("")
+                .paddingWidth(6)
+                .formatTemplate("{PREFIX}{SEQ}")
+                .build());
+
         return category;
     }
 
