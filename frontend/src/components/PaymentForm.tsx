@@ -245,7 +245,7 @@ export default function PaymentForm({ direction }: Props) {
               value={billNumber}
               onChange={(e) => setBillNumber(e.target.value)}
               disabled={!billTypeId}
-              placeholder={billTypeId ? 'Enter bill number' : 'Select bill number type first'}
+              placeholder={billTypeId ? 'Enter bill number' : 'Select bill id first'}
               className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
             />
             {composedBillNumber && (
