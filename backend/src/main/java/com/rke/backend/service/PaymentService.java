@@ -16,6 +16,7 @@ import com.rke.backend.domain.Transaction;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.TransactionStatus;
 import com.rke.backend.domain.enums.TransactionType;
+import com.rke.backend.domain.ledger.TransactionClassifier;
 import com.rke.backend.dto.PaymentRequest;
 import com.rke.backend.dto.PaymentUpdateRequest;
 import com.rke.backend.dto.TransactionResponse;
@@ -174,7 +175,8 @@ public class PaymentService {
      * Computes the outstanding balance for a farmer by summing directly from the
      * transaction log — never from a stored column, so it can never drift.
      *
-     * <p>outstanding = SUM(credit_sales) − SUM(cash_payments) − SUM(cash_receipts)
+     * <p>Uses {@link TransactionClassifier} to determine the sign of each transaction type.
+     * outstanding &lt; 0 → farmer owes firm; outstanding &gt; 0 → firm owes farmer.
      * (only ACTIVE, non-voided transactions count)
      */
     @Transactional(readOnly = true)
@@ -183,13 +185,13 @@ public class PaymentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Farmer not found: " + farmerId));
 
-        var active = TransactionStatus.ACTIVE;
-
-        BigDecimal credit = nvl(transactionRepository.sumGrandTotal(farmerId, TransactionType.CREDIT_SALE, active));
-        BigDecimal payments = nvl(transactionRepository.sumGrandTotal(farmerId, TransactionType.CASH_PAYMENT, active));
-        BigDecimal receipts = nvl(transactionRepository.sumGrandTotal(farmerId, TransactionType.CASH_RECEIPT, active));
-
-        return credit.subtract(payments).subtract(receipts);
+        BigDecimal outstanding = BigDecimal.ZERO;
+        for (TransactionType type : TransactionType.values()) {
+            BigDecimal total = nvl(transactionRepository.sumGrandTotal(
+                    farmerId, type, TransactionStatus.ACTIVE));
+            outstanding = outstanding.add(TransactionClassifier.signedAmount(type, total));
+        }
+        return outstanding;
     }
 
     private static BigDecimal nvl(BigDecimal value) {

@@ -7,6 +7,8 @@ export interface FarmerLedgerRow {
   billNumber: string
   transactionType: string
   grandTotal: number
+  direction: 'DEBIT' | 'CREDIT'
+  signedAmount: number
   runningBalance: number
   interestAmount: number
 }

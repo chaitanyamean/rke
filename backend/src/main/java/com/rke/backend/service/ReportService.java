@@ -8,6 +8,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.rke.backend.domain.enums.TransactionType;
+import com.rke.backend.domain.ledger.TransactionClassifier;
 import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
@@ -49,14 +51,11 @@ public class ReportService {
      * Returns all transactions for the given farmer in chronological order with a
      * running credit balance computed as a window function in the database.
      *
-     * <p>Balance contribution per transaction type:
-     * <ul>
-     *   <li>{@code credit_sale}  → +grand_total (increases outstanding)</li>
-     *   <li>{@code return}       → −|grand_total| (reduces outstanding)</li>
-     *   <li>{@code cash_payment} → −grand_total (reduces outstanding)</li>
-     *   <li>{@code cash_receipt} → −grand_total (reduces outstanding)</li>
-     *   <li>{@code cash_sale}    → 0 (cash; no credit impact)</li>
-     * </ul>
+     * <p>Balance contribution per transaction type is derived from
+     * {@link TransactionClassifier} — it is the single source of truth for the
+     * sign convention. DEBIT types contribute a negative amount (increases what
+     * the farmer owes); CREDIT types contribute a positive amount (decreases
+     * what the farmer owes).
      *
      * <p>{@code interestAmount} is always {@code 0} — the real formula has not
      * been confirmed by the client yet (TODO).
@@ -67,26 +66,24 @@ public class ReportService {
                                               boolean includeVoided) {
         UUID tenantId = currentUserService.getTenantId();
 
-        StringBuilder sql = new StringBuilder("""
-                SELECT
-                    t.id::text,
-                    t.transaction_date::text,
-                    t.bill_number,
-                    t.transaction_type,
-                    t.grand_total,
-                    SUM(
-                        CASE
-                            WHEN t.transaction_type = 'credit_sale'                      THEN  t.grand_total
-                            WHEN t.transaction_type IN ('cash_payment','cash_receipt')   THEN -t.grand_total
-                            WHEN t.transaction_type = 'return'                           THEN -ABS(t.grand_total)
-                            ELSE 0
-                        END
-                    ) OVER (ORDER BY t.transaction_date, t.created_at
-                            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance
-                FROM transactions t
-                WHERE t.tenant_id = :tenantId
-                  AND t.farmer_id = :farmerId
-                """);
+        String contributionCase = buildLedgerContributionCase();
+
+        String selectSql =
+                "SELECT\n" +
+                "    t.id::text,\n" +
+                "    t.transaction_date::text,\n" +
+                "    t.bill_number,\n" +
+                "    t.transaction_type,\n" +
+                "    t.grand_total,\n" +
+                "    " + contributionCase + " AS signed_amount,\n" +
+                "    SUM(" + contributionCase + ")" +
+                " OVER (ORDER BY t.transaction_date, t.created_at" +
+                " ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance\n" +
+                "FROM transactions t\n" +
+                "WHERE t.tenant_id = :tenantId\n" +
+                "  AND t.farmer_id = :farmerId\n";
+
+        StringBuilder sql = new StringBuilder(selectSql);
 
         if (!includeVoided) sql.append(" AND t.status = 'active'");
         if (fromDate != null) sql.append(" AND t.transaction_date >= :fromDate");
@@ -103,15 +100,22 @@ public class ReportService {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
 
-        return rows.stream().map(r -> new FarmerLedgerRow(
-                str(r[0]),
-                str(r[1]),
-                str(r[2]),
-                str(r[3]),
-                decimal(r[4]),
-                decimal(r[5]),
-                BigDecimal.ZERO  // TODO: interest formula not confirmed by client
-        )).toList();
+        return rows.stream().map(r -> {
+            String txType = str(r[3]);
+            TransactionType type = TransactionType.valueOf(txType.toUpperCase());
+            String direction = TransactionClassifier.classify(type).name();
+            return new FarmerLedgerRow(
+                    str(r[0]),       // transactionId
+                    str(r[1]),       // transactionDate
+                    str(r[2]),       // billNumber
+                    txType,          // transactionType
+                    decimal(r[4]),   // grandTotal
+                    direction,       // direction (DEBIT or CREDIT)
+                    decimal(r[5]),   // signedAmount (negative for debits, positive for credits)
+                    decimal(r[6]),   // runningBalance
+                    BigDecimal.ZERO  // interestAmount — formula not confirmed by client (TODO)
+            );
+        }).toList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -396,6 +400,29 @@ public class ReportService {
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns a SQL CASE expression that maps transaction_type to its signed
+     * ledger contribution. Derived from TransactionClassifier so the SQL and
+     * Java balance computations can never diverge.
+     *
+     * Result: negative for DEBIT types (increases owed), positive for CREDIT types.
+     */
+    private static String buildLedgerContributionCase() {
+        StringBuilder sb = new StringBuilder("CASE ");
+        for (TransactionType type : TransactionType.values()) {
+            String token = type.name().toLowerCase();
+            if (TransactionClassifier.isDebit(type)) {
+                sb.append(String.format(
+                    "WHEN t.transaction_type = '%s' THEN -ABS(t.grand_total) ", token));
+            } else {
+                sb.append(String.format(
+                    "WHEN t.transaction_type = '%s' THEN ABS(t.grand_total) ", token));
+            }
+        }
+        sb.append("ELSE 0 END");
+        return sb.toString();
+    }
 
     private static long longVal(Object o) {
         if (o == null) return 0L;

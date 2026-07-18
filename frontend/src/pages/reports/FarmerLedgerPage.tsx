@@ -5,6 +5,7 @@ import { useFarmerLedger, type DateRangeFilter } from '../../api/reports'
 import { useAuth } from '../../auth/AuthContext'
 import FarmerSelector from '../../components/FarmerSelector'
 import ReportShell from '../../components/ReportShell'
+import { formatBalance } from '../../lib/balance'
 
 /** Maps a ledger row's transaction_type token to its admin-only edit route. */
 function editPathFor(transactionType: string, transactionId: string): string | null {
@@ -87,7 +88,7 @@ export default function FarmerLedgerPage() {
           <table className="w-full min-w-[700px] text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Bill Number', 'Type', 'Amount (₹)', 'Balance (₹)', 'Interest (₹)']
+                {['Date', 'Bill Number', 'Type', 'Direction', 'Amount (₹)', 'Balance (₹)', 'Interest (₹)']
                   .concat(isAdmin ? [''] : [])
                   .map((h, i) => (
                     <th key={i} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
@@ -96,8 +97,8 @@ export default function FarmerLedgerPage() {
             </thead>
             <tbody>
               {data.map((row, i) => {
-                const isDebit = row.transactionType === 'credit_sale'
-                const isCredit = ['cash_payment', 'cash_receipt', 'return'].includes(row.transactionType)
+                const isDebit = row.direction === 'DEBIT'
+                const isCredit = row.direction === 'CREDIT'
                 const editPath = isAdmin ? editPathFor(row.transactionType, row.transactionId) : null
                 return (
                   <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
@@ -112,8 +113,17 @@ export default function FarmerLedgerPage() {
                         {fmtType(row.transactionType)}
                       </span>
                     </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                        row.direction === 'DEBIT'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {row.direction}
+                      </span>
+                    </td>
                     <td className={`px-4 py-2.5 text-right font-medium ${isDebit ? 'text-red-600' : isCredit ? 'text-green-600' : 'text-slate-700'}`}>
-                      {fmtCcy(Math.abs(row.grandTotal))}
+                      {row.direction === 'DEBIT' ? '−' : '+'}₹{fmtCcy(Math.abs(row.signedAmount))}
                     </td>
                     <td className={`px-4 py-2.5 text-right font-semibold ${row.runningBalance > 0 ? 'text-red-700' : row.runningBalance < 0 ? 'text-green-700' : 'text-slate-500'}`}>
                       {fmtCcy(row.runningBalance)}
@@ -134,10 +144,15 @@ export default function FarmerLedgerPage() {
             </tbody>
             <tfoot className="bg-slate-50 font-semibold">
               <tr>
-                <td colSpan={4} className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Closing Balance</td>
-                <td className={`px-4 py-3 text-right ${data[data.length - 1].runningBalance > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                  ₹{fmtCcy(data[data.length - 1].runningBalance)}
-                </td>
+                <td colSpan={5} className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Closing Balance</td>
+                {(() => {
+                  const { label, direction: dir } = formatBalance(data[data.length - 1].runningBalance)
+                  return (
+                    <td className={`px-4 py-3 text-right ${dir === 'owes' ? 'text-red-700' : dir === 'credit' ? 'text-green-700' : 'text-slate-500'}`}>
+                      {label}
+                    </td>
+                  )
+                })()}
                 <td />
                 {isAdmin && <td />}
               </tr>

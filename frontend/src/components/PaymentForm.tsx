@@ -4,6 +4,7 @@ import type { PaymentInput } from '../api/payments'
 import { useCreatePayment, useCreateReceipt, useFarmerBalance } from '../api/payments'
 import { useBillNumberTypes } from '../api/billNumberTypes'
 import FarmerSelector from './FarmerSelector'
+import { formatBalance } from '../lib/balance'
 
 type Direction = 'payment' | 'receipt'
 type Phase = 'form' | 'review' | 'done'
@@ -193,19 +194,22 @@ export default function PaymentForm({ direction }: Props) {
             {balanceLoading ? (
               <span className="text-sm text-slate-400">Loading…</span>
             ) : (
-              <span
-                className={`text-lg font-bold ${
-                  (balance ?? 0) > 0
-                    ? 'text-red-600'
-                    : (balance ?? 0) < 0
-                    ? 'text-green-600'
-                    : 'text-slate-600'
-                }`}
-              >
-                ₹{(balance ?? 0).toFixed(2)}
-                {(balance ?? 0) > 0 && ' (owes)'}
-                {(balance ?? 0) < 0 && ' (credit)'}
-              </span>
+              (() => {
+                const { label, direction } = formatBalance(balance ?? 0)
+                return (
+                  <span
+                    className={`text-lg font-bold ${
+                      direction === 'owes'
+                        ? 'text-red-600'
+                        : direction === 'credit'
+                        ? 'text-green-600'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                )
+              })()
             )}
           </div>
         )}
