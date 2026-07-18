@@ -7,13 +7,15 @@ interface Props {
   isLoading: boolean
   ran: boolean
   children: ReactNode
+  /** Optional extra buttons rendered after "Run Report" */
+  actions?: ReactNode
 }
 
 /**
  * Consistent layout shared by all report pages:
  *   title → filter row → "Run Report" button → results table
  */
-export default function ReportShell({ title, filters, onRun, isLoading, ran, children }: Props) {
+export default function ReportShell({ title, filters, onRun, isLoading, ran, children, actions }: Props) {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
@@ -28,6 +30,7 @@ export default function ReportShell({ title, filters, onRun, isLoading, ran, chi
           >
             {isLoading ? 'Loading…' : 'Run Report'}
           </button>
+          {actions}
         </div>
       </section>
 

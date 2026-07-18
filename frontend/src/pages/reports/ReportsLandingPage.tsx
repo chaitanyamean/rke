@@ -4,7 +4,7 @@ const REPORTS = [
   { to: '/reports/ledger',              label: 'Farmer Ledger',         desc: 'Chronological transaction history with running balance for a specific farmer.' },
   { to: '/reports/village-outstandings', label: 'Village Outstandings', desc: 'Outstanding credit balance aggregated by village.' },
   { to: '/reports/item-sales',           label: 'Item Sales',           desc: 'Net quantity and amount sold per item, filterable by category and date.' },
-  { to: '/reports/date-sales',           label: 'Daily Sales',          desc: 'Day-by-day sales totals with cash vs credit breakdown.' },
+  { to: '/reports/date-sales',           label: 'Sales Summary',        desc: 'Day-by-day sales totals with cash vs credit breakdown and returns.' },
   { to: '/reports/date-payments',        label: 'Daily Payments',       desc: 'Day-by-day payment and receipt totals.' },
 ]
 

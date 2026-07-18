@@ -6,11 +6,26 @@ export interface FarmerLedgerRow {
   transactionDate: string
   billNumber: string
   transactionType: string
-  grandTotal: number
   direction: 'DEBIT' | 'CREDIT'
-  signedAmount: number
+  // item-level (null for payment/receipt rows)
+  categoryName: string | null
+  itemName: string | null
+  quantity: number | null
+  price: number | null
+  // transaction-level amounts (same across all item rows of same transaction)
+  debitAmount: number
+  creditAmount: number
   runningBalance: number
   interestAmount: number
+  remarks: string | null
+}
+
+export interface FarmerOutstandingRow {
+  farmerId: string
+  farmerName: string
+  fatherName: string | null
+  villageName: string | null
+  outstandingBalance: number
 }
 
 export interface VillageOutstandingRow {
@@ -32,6 +47,7 @@ export interface DateSalesRow {
   date: string
   cashSalesTotal: number
   creditSalesTotal: number
+  returnsTotal: number
   dayTotal: number
 }
 
@@ -67,6 +83,23 @@ export function useFarmerLedger(
       ).data
     },
     enabled: enabled && !!farmerId,
+  })
+}
+
+export function useFarmerOutstandings(
+  filter: DateRangeFilter & { villageId?: string },
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['report', 'farmer-outstandings', filter],
+    queryFn: async () => {
+      const params: Record<string, string> = {}
+      if (filter.fromDate) params.fromDate = filter.fromDate
+      if (filter.toDate)   params.toDate   = filter.toDate
+      if (filter.villageId) params.villageId = filter.villageId
+      return (await api.get<FarmerOutstandingRow[]>('/api/reports/farmer-outstandings', { params })).data
+    },
+    enabled,
   })
 }
 

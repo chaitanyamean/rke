@@ -7,8 +7,9 @@ function fmtCcy(n: number) {
 }
 
 export default function DatePaymentsPage() {
-  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '', toDate: '', includeVoided: false })
-  const [active, setActive] = useState<DateRangeFilter | null>(null)
+  const today = new Date().toISOString().slice(0, 10)
+  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: today, toDate: today, includeVoided: false })
+  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: today, toDate: today, includeVoided: false })
 
   const { data = [], isLoading } = useDatePayments(active ?? {}, !!active)
 
@@ -30,12 +31,12 @@ export default function DatePaymentsPage() {
           className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
       </label>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      {/* <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={!!draft.includeVoided}
           onChange={(e) => setDraft((d) => ({ ...d, includeVoided: e.target.checked }))}
           className="h-4 w-4 accent-slate-700" />
         Include voided
-      </label>
+      </label> */}
     </>
   )
 

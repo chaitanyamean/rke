@@ -349,7 +349,7 @@ export default function SaleForm({ saleType }: Props) {
                 inputMode="text"
                 value={billNumber}
                 onChange={(e) => {
-                  const digitsOnly = e.target.value.replace(/[^0-9]/g, '')
+                  const digitsOnly = e.target.value;
                   setBillNumber(digitsOnly)
                   setBillNumberAuto(false)
                 }}

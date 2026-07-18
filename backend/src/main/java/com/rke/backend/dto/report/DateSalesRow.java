@@ -6,5 +6,6 @@ public record DateSalesRow(
         String date,
         BigDecimal cashSalesTotal,
         BigDecimal creditSalesTotal,
+        BigDecimal returnsTotal,
         BigDecimal dayTotal) {
 }

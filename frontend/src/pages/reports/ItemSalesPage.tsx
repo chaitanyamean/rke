@@ -11,10 +11,13 @@ function fmtCcy(n: number) {
 }
 
 export default function ItemSalesPage() {
+  const today = new Date().toISOString().slice(0, 10)
   const [draft, setDraft] = useState<DateRangeFilter & { categoryId?: string }>({
-    fromDate: '', toDate: '', includeVoided: false, categoryId: '',
+    fromDate: today, toDate: today, includeVoided: false, categoryId: '',
   })
-  const [active, setActive] = useState<typeof draft | null>(null)
+  const [active, setActive] = useState<typeof draft | null>({
+    fromDate: today, toDate: today, includeVoided: false, categoryId: '',
+  })
 
   const { data: categories = [] } = useItemCategories()
   const { data = [], isLoading } = useItemSales(active ?? {}, !!active)
@@ -47,12 +50,12 @@ export default function ItemSalesPage() {
         </select>
       </label>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      {/* <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={!!draft.includeVoided}
           onChange={(e) => setDraft((d) => ({ ...d, includeVoided: e.target.checked }))}
           className="h-4 w-4 accent-slate-700" />
         Include voided
-      </label>
+      </label> */}
     </>
   )
 

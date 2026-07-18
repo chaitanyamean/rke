@@ -7,14 +7,16 @@ function fmtCcy(n: number) {
 }
 
 export default function DateSalesPage() {
-  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '', toDate: '', includeVoided: false })
-  const [active, setActive] = useState<DateRangeFilter | null>(null)
+  const today = new Date().toISOString().slice(0, 10)
+  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: today, toDate: today, includeVoided: false })
+  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: today, toDate: today, includeVoided: false })
 
   const { data = [], isLoading } = useDateSales(active ?? {}, !!active)
 
-  const totCash   = data.reduce((s, r) => s + r.cashSalesTotal, 0)
-  const totCredit = data.reduce((s, r) => s + r.creditSalesTotal, 0)
-  const totDay    = data.reduce((s, r) => s + r.dayTotal, 0)
+  const totCash    = data.reduce((s, r) => s + r.cashSalesTotal, 0)
+  const totCredit  = data.reduce((s, r) => s + r.creditSalesTotal, 0)
+  const totReturns = data.reduce((s, r) => s + r.returnsTotal, 0)
+  const totDay     = data.reduce((s, r) => s + r.dayTotal, 0)
 
   const filters = (
     <>
@@ -30,17 +32,17 @@ export default function DateSalesPage() {
           className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
       </label>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      {/* <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={!!draft.includeVoided}
           onChange={(e) => setDraft((d) => ({ ...d, includeVoided: e.target.checked }))}
           className="h-4 w-4 accent-slate-700" />
         Include voided
-      </label>
+      </label> */}
     </>
   )
 
   return (
-    <ReportShell title="Daily Sales" filters={filters} onRun={() => setActive({ ...draft })}
+    <ReportShell title="Sales Summary" filters={filters} onRun={() => setActive({ ...draft })}
       isLoading={isLoading} ran={!!active}>
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No data found.</p>
@@ -49,7 +51,7 @@ export default function DateSalesPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Cash Sales (₹)', 'Credit Sales (₹)', 'Day Total (₹)'].map((h) => (
+                {['Date', 'Cash Sales (₹)', 'Credit Sales (₹)', 'Returns (₹)', 'Day Total (₹)'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
                 ))}
               </tr>
@@ -60,6 +62,7 @@ export default function DateSalesPage() {
                   <td className="px-4 py-2.5 text-slate-600">{row.date}</td>
                   <td className="px-4 py-2.5 text-right text-slate-700">{fmtCcy(row.cashSalesTotal)}</td>
                   <td className="px-4 py-2.5 text-right text-slate-700">{fmtCcy(row.creditSalesTotal)}</td>
+                  <td className="px-4 py-2.5 text-right text-red-600">{row.returnsTotal > 0 ? `-${fmtCcy(row.returnsTotal)}` : '—'}</td>
                   <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{fmtCcy(row.dayTotal)}</td>
                 </tr>
               ))}
@@ -69,6 +72,7 @@ export default function DateSalesPage() {
                 <td className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Total</td>
                 <td className="px-4 py-3 text-right text-slate-700">₹{fmtCcy(totCash)}</td>
                 <td className="px-4 py-3 text-right text-slate-700">₹{fmtCcy(totCredit)}</td>
+                <td className="px-4 py-3 text-right text-red-600">{totReturns > 0 ? `-₹${fmtCcy(totReturns)}` : '—'}</td>
                 <td className="px-4 py-3 text-right text-slate-800">₹{fmtCcy(totDay)}</td>
               </tr>
             </tfoot>

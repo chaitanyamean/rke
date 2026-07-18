@@ -13,6 +13,7 @@ import com.rke.backend.domain.ledger.TransactionClassifier;
 import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
+import com.rke.backend.dto.report.FarmerOutstandingRow;
 import com.rke.backend.dto.report.FarmerLedgerRow;
 import com.rke.backend.dto.report.ItemSalesRow;
 import com.rke.backend.dto.report.RecentTransactionRow;
@@ -51,6 +52,11 @@ public class ReportService {
      * Returns all transactions for the given farmer in chronological order with a
      * running credit balance computed as a window function in the database.
      *
+     * <p>For transactions with line items (sales, returns) there is one row per
+     * item so the frontend can display Category / Item / Qty / Price columns.
+     * For payment/receipt transactions (no line items) a single row is returned
+     * with null item-level fields.
+     *
      * <p>Balance contribution per transaction type is derived from
      * {@link TransactionClassifier} — it is the single source of truth for the
      * sign convention. DEBIT types contribute a negative amount (increases what
@@ -68,28 +74,38 @@ public class ReportService {
 
         String contributionCase = buildLedgerContributionCase();
 
+        // Window function over the transaction-level signed amount so each item
+        // row of the same transaction carries the same running balance.
         String selectSql =
                 "SELECT\n" +
                 "    t.id::text,\n" +
                 "    t.transaction_date::text,\n" +
                 "    t.bill_number,\n" +
                 "    t.transaction_type,\n" +
-                "    t.grand_total,\n" +
-                "    " + contributionCase + " AS signed_amount,\n" +
+                "    ic.name        AS category_name,\n" +
+                "    i.name         AS item_name,\n" +
+                "    ti.quantity,\n" +
+                "    ti.price,\n" +
+                "    CASE WHEN (" + contributionCase + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
+                "    CASE WHEN (" + contributionCase + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount,\n" +
                 "    SUM(" + contributionCase + ")" +
-                " OVER (ORDER BY t.transaction_date, t.created_at" +
-                " ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance\n" +
+                " OVER (ORDER BY t.transaction_date, t.created_at, t.id" +
+                " ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance,\n" +
+                "    t.remarks\n" +
                 "FROM transactions t\n" +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id AND ti.tenant_id = :tenantId\n" +
+                "LEFT JOIN items i              ON i.id = ti.item_id\n" +
+                "LEFT JOIN item_categories ic   ON ic.id = i.item_category_id\n" +
                 "WHERE t.tenant_id = :tenantId\n" +
                 "  AND t.farmer_id = :farmerId\n";
 
         StringBuilder sql = new StringBuilder(selectSql);
 
-        if (!includeVoided) sql.append(" AND t.status = 'active'");
-        if (fromDate != null) sql.append(" AND t.transaction_date >= :fromDate");
-        if (toDate != null)   sql.append(" AND t.transaction_date <= :toDate");
+        if (!includeVoided) sql.append(" AND t.status = 'active'\n");
+        if (fromDate != null) sql.append(" AND t.transaction_date >= :fromDate\n");
+        if (toDate != null)   sql.append(" AND t.transaction_date <= :toDate\n");
 
-        sql.append(" ORDER BY t.transaction_date, t.created_at");
+        sql.append(" ORDER BY t.transaction_date, t.created_at, t.id, ic.name NULLS LAST, i.name NULLS LAST");
 
         Query query = entityManager.createNativeQuery(sql.toString());
         query.setParameter("tenantId", tenantId);
@@ -109,11 +125,16 @@ public class ReportService {
                     str(r[1]),       // transactionDate
                     str(r[2]),       // billNumber
                     txType,          // transactionType
-                    decimal(r[4]),   // grandTotal
                     direction,       // direction (DEBIT or CREDIT)
-                    decimal(r[5]),   // signedAmount (negative for debits, positive for credits)
-                    decimal(r[6]),   // runningBalance
-                    BigDecimal.ZERO  // interestAmount — formula not confirmed by client (TODO)
+                    str(r[4]),       // categoryName (null for payment/receipt)
+                    str(r[5]),       // itemName (null for payment/receipt)
+                    decimal(r[6]),   // quantity (null → 0 for payment/receipt)
+                    decimal(r[7]),   // price (null → 0 for payment/receipt)
+                    decimal(r[8]),   // debitAmount
+                    decimal(r[9]),   // creditAmount
+                    decimal(r[10]),  // runningBalance
+                    BigDecimal.ZERO, // interestAmount — formula not confirmed by client (TODO)
+                    str(r[11])       // remarks
             );
         }).toList();
     }
@@ -166,9 +187,68 @@ public class ReportService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3. Item sales — net quantity/amount per item (sales minus returns)
+    // 2b. Farmer outstandings — per-farmer outstanding balance with date filter
     // ─────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Returns each farmer's outstanding balance for the given date range,
+     * using the same {@link TransactionClassifier} sign convention as
+     * {@link com.rke.backend.service.PaymentService#getOutstandingBalance}.
+     * Only active (non-voided) transactions are included.
+     * Optionally filtered by village.
+     */
+    @Transactional(readOnly = true)
+    public List<FarmerOutstandingRow> farmerOutstandings(UUID villageId,
+                                                          LocalDate fromDate,
+                                                          LocalDate toDate) {
+        UUID tenantId = currentUserService.getTenantId();
+
+        String contributionCase = buildLedgerContributionCase();
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT\n" +
+                "    f.id::text,\n" +
+                "    f.name,\n" +
+                "    f.father_name,\n" +
+                "    v.name AS village_name,\n" +
+                "    COALESCE(SUM(" + contributionCase + "), 0) AS outstanding_balance\n" +
+                "FROM farmers f\n" +
+                "LEFT JOIN villages v ON v.id = f.village_id\n" +
+                "LEFT JOIN transactions t\n" +
+                "       ON t.farmer_id = f.id\n" +
+                "      AND t.tenant_id = :tenantId\n" +
+                "      AND t.status    = 'active'\n");
+
+        if (fromDate != null) sql.append("      AND t.transaction_date >= :fromDate\n");
+        if (toDate != null)   sql.append("      AND t.transaction_date <= :toDate\n");
+
+        sql.append("WHERE f.tenant_id = :tenantId\n");
+        if (villageId != null) sql.append("  AND f.village_id = :villageId\n");
+
+        sql.append("GROUP BY f.id, f.name, f.father_name, v.name\n");
+        sql.append("ORDER BY v.name NULLS LAST, f.name");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        query.setParameter("tenantId", tenantId);
+        if (fromDate != null)  query.setParameter("fromDate", fromDate);
+        if (toDate != null)    query.setParameter("toDate", toDate);
+        if (villageId != null) query.setParameter("villageId", villageId);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        return rows.stream().map(r -> new FarmerOutstandingRow(
+                str(r[0]),    // farmerId
+                str(r[1]),    // farmerName
+                str(r[2]),    // fatherName
+                str(r[3]),    // villageName
+                decimal(r[4]) // outstandingBalance
+        )).toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 3. Item sales — net quantity/amount per item (sales minus returns)
+    // ─────────────────────────────────────────────────────────────────────────
     /**
      * Returns net quantity and amount sold per item. Returns are included with
      * their negative amounts so the totals are net (SUM naturally deducts them).
@@ -233,10 +313,14 @@ public class ReportService {
                     t.transaction_date::text,
                     COALESCE(SUM(CASE WHEN t.transaction_type = 'cash_sale'   THEN t.grand_total END), 0),
                     COALESCE(SUM(CASE WHEN t.transaction_type = 'credit_sale' THEN t.grand_total END), 0),
-                    COALESCE(SUM(t.grand_total), 0)
+                    COALESCE(SUM(CASE WHEN t.transaction_type = 'return'      THEN ABS(t.grand_total) END), 0),
+                    COALESCE(SUM(CASE WHEN t.transaction_type = 'cash_sale'   THEN t.grand_total
+                                     WHEN t.transaction_type = 'credit_sale' THEN t.grand_total
+                                     WHEN t.transaction_type = 'return'      THEN -ABS(t.grand_total)
+                                END), 0)
                 FROM transactions t
                 WHERE t.tenant_id = :tenantId
-                  AND t.transaction_type IN ('cash_sale','credit_sale')
+                  AND t.transaction_type IN ('cash_sale','credit_sale','return')
                 """);
 
         if (!includeVoided) sql.append(" AND t.status = 'active'");
@@ -254,7 +338,7 @@ public class ReportService {
         List<Object[]> rows = query.getResultList();
 
         return rows.stream().map(r -> new DateSalesRow(
-                str(r[0]), decimal(r[1]), decimal(r[2]), decimal(r[3])
+                str(r[0]), decimal(r[1]), decimal(r[2]), decimal(r[3]), decimal(r[4])
         )).toList();
     }
 

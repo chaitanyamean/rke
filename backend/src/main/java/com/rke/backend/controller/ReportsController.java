@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rke.backend.dto.report.FarmerOutstandingRow;
 import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
@@ -61,6 +62,15 @@ public class ReportsController {
     public List<VillageOutstandingRow> villageOutstandings(
             @RequestParam(required = false) UUID villageId) {
         return reportService.villageOutstandings(villageId);
+    }
+
+    /** Outstanding balance per farmer, filtered by date range and optional village. */
+    @GetMapping("/farmer-outstandings")
+    public List<FarmerOutstandingRow> farmerOutstandings(
+            @RequestParam(required = false) UUID villageId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return reportService.farmerOutstandings(villageId, fromDate, toDate);
     }
 
     /** Net quantity and amount sold (sales minus returns) per item. */
