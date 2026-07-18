@@ -10,7 +10,7 @@ function fmtCcy(n: number) {
 export default function VillageOutstandingsPage() {
   const [villageId, setVillageId] = useState('')
   const [activeVillageId, setActiveVillageId] = useState<string | null>(null)
-  const [ran, setRan] = useState(false)
+  const [ran, setRan] = useState(true) // auto-run on load with all villages
 
   const { data: villages = [] } = useVillages()
   const { data = [], isLoading } = useVillageOutstandings(activeVillageId, ran)

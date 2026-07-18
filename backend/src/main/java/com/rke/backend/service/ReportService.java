@@ -144,7 +144,7 @@ public class ReportService {
                        ON t.farmer_id = f.id
                       AND t.tenant_id = :tenantId
                       AND t.status    = 'active'
-                WHERE v.tenant_id = :tenantId
+                WHERE 1=1
                 """);
 
         if (villageId != null) sql.append(" AND v.id = :villageId");
