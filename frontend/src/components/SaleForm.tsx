@@ -346,7 +346,7 @@ export default function SaleForm({ saleType }: Props) {
             <div className="flex gap-2">
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="text"
                 value={billNumber}
                 onChange={(e) => {
                   const digitsOnly = e.target.value.replace(/[^0-9]/g, '')

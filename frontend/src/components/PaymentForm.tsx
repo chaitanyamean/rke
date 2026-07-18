@@ -3,6 +3,7 @@ import type { Farmer } from '../types'
 import type { PaymentInput } from '../api/payments'
 import { useCreatePayment, useCreateReceipt, useFarmerBalance } from '../api/payments'
 import { useBillNumberTypes } from '../api/billNumberTypes'
+import { useItemCategories } from '../api/itemCategories'
 import FarmerSelector from './FarmerSelector'
 import { formatBalance } from '../lib/balance'
 
@@ -25,13 +26,21 @@ export default function PaymentForm({ direction }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   const [farmer, setFarmer] = useState<Farmer | null>(null)
+  const [categoryId, setCategoryId] = useState('')
   const [billTypeId, setBillTypeId] = useState('')
   const [billNumber, setBillNumber] = useState('')
   const [txDate, setTxDate] = useState(today)
   const [amount, setAmount] = useState('')
   const [remarks, setRemarks] = useState('')
 
-  const { data: billTypes = [] } = useBillNumberTypes()
+  const { data: categories = [] } = useItemCategories()
+  const { data: allBillTypes = [] } = useBillNumberTypes()
+
+  // Filter bill number types to only those belonging to the selected category
+  const billTypes = useMemo(
+    () => (categoryId ? allBillTypes.filter((bt) => bt.itemCategoryId === categoryId) : allBillTypes),
+    [allBillTypes, categoryId],
+  )
   const { data: balance, isLoading: balanceLoading } = useFarmerBalance(farmer?.id ?? null)
 
   const createPayment = useCreatePayment()
@@ -52,6 +61,7 @@ export default function PaymentForm({ direction }: Props) {
 
   const isFormComplete =
     farmer &&
+    categoryId &&
     billTypeId &&
     composedBillNumber &&
     txDate &&
@@ -106,6 +116,7 @@ export default function PaymentForm({ direction }: Props) {
   const handleReset = () => {
     setPhase('form')
     setFarmer(null)
+    setCategoryId('')
     setBillTypeId('')
     setBillNumber('')
     setTxDate(today())
@@ -146,6 +157,7 @@ export default function PaymentForm({ direction }: Props) {
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3 text-sm">
           <Row label="Farmer" value={`${farmer?.name}${farmer?.fatherName ? ' / ' + farmer.fatherName : ''}`} />
+          <Row label="Category" value={categories.find((c) => c.id === categoryId)?.name ?? categoryId} />
           <Row label="Bill Type" value={billTypeName} />
           <Row label="Bill Number" value={composedBillNumber} />
           <Row label="Date" value={txDate} />
@@ -224,12 +236,35 @@ export default function PaymentForm({ direction }: Props) {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
+              Item Category <span className="text-red-500">*</span>
+            </span>
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value)
+                setBillTypeId('')
+                setBillNumber('')
+              }}
+              className="w-full rounded-md border border-slate-300 px-3 py-2"
+            >
+              <option value="">Select category…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">
               Bill Number Type <span className="text-red-500">*</span>
             </span>
             <select
               value={billTypeId}
               onChange={(e) => setBillTypeId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              disabled={!categoryId}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
             >
               <option value="">Select type…</option>
               {billTypes.map((bt) => (

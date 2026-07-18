@@ -36,7 +36,11 @@ function fmtCcy(n: number) {
 export default function FarmerLedgerPage() {
   const { isAdmin } = useAuth()
   const [farmer, setFarmer] = useState<Farmer | null>(null)
-  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '', toDate: '', includeVoided: false })
+  const [draft, setDraft] = useState<DateRangeFilter>({
+    fromDate: `${new Date().getFullYear()}-04-01`,
+    toDate: new Date().toISOString().slice(0, 10),
+    includeVoided: false,
+  })
   const [active, setActive] = useState<(DateRangeFilter & { farmerId: string }) | null>(null)
 
   const { data = [], isLoading } = useFarmerLedger(
