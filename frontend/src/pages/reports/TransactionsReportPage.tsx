@@ -66,8 +66,6 @@ export default function TransactionsReportPage() {
   // All fields are optional — Run Report always fires with whatever is filled in
   const run = () => setActive({ ...draft })
 
-  const colCount = 10 + (isAdmin ? 1 : 0)
-
   const filters = (
     <>
       <label className="block">
@@ -194,7 +192,7 @@ export default function TransactionsReportPage() {
             </tbody>
             <tfoot className="bg-slate-50 border-t-2 border-slate-300">
               <tr className="font-semibold text-sm">
-                <td colSpan={colCount - 2} className="px-3 py-3 text-right text-xs uppercase tracking-wide text-slate-500">
+                <td colSpan={8} className="px-3 py-3 text-right text-xs uppercase tracking-wide text-slate-500">
                   {groups.length} transaction{groups.length !== 1 ? 's' : ''}
                 </td>
                 <td className="px-3 py-3 text-right text-red-700">

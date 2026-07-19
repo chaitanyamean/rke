@@ -16,7 +16,6 @@ export default function DatePaymentsPage() {
   const totPay     = data.reduce((s, r) => s + r.paymentsTotal, 0)
   const totReceipt = data.reduce((s, r) => s + r.receiptsTotal, 0)
   const totDay     = data.reduce((s, r) => s + r.dayTotal, 0)
-
   const filters = (
     <>
       <label className="block">
@@ -50,8 +49,8 @@ export default function DatePaymentsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Payments (₹)', 'Receipts (₹)', 'Day Total (₹)'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                {[['Date', 'text-left'], ['Payments (₹)', 'text-right'], ['Receipts (₹)', 'text-right'], ['Day Total (₹)', 'text-right']].map(([h, align]) => (
+                  <th key={h} className={`px-4 py-3 ${align} text-xs font-semibold uppercase tracking-wide text-slate-500`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -59,18 +58,30 @@ export default function DatePaymentsPage() {
               {data.map((row) => (
                 <tr key={row.date} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-2.5 text-slate-600">{row.date}</td>
-                  <td className="px-4 py-2.5 text-right text-green-700">{fmtCcy(row.paymentsTotal)}</td>
-                  <td className="px-4 py-2.5 text-right text-blue-700">{fmtCcy(row.receiptsTotal)}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{fmtCcy(row.dayTotal)}</td>
+                  <td className="px-4 py-2.5 text-right text-red-600">
+                    {row.paymentsTotal > 0 ? `-₹${fmtCcy(row.paymentsTotal)}` : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-green-700">
+                    {row.receiptsTotal > 0 ? `+₹${fmtCcy(row.receiptsTotal)}` : '—'}
+                  </td>
+                  <td className={`px-4 py-2.5 text-right font-semibold ${row.dayTotal >= 0 ? 'text-slate-800' : 'text-red-700'}`}>
+                    {row.dayTotal >= 0 ? '' : '-'}₹{fmtCcy(Math.abs(row.dayTotal))}
+                  </td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="bg-slate-50 font-semibold">
               <tr>
-                <td className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Total</td>
-                <td className="px-4 py-3 text-right text-green-700">₹{fmtCcy(totPay)}</td>
-                <td className="px-4 py-3 text-right text-blue-700">₹{fmtCcy(totReceipt)}</td>
-                <td className="px-4 py-3 text-right text-slate-800">₹{fmtCcy(totDay)}</td>
+                <td className="px-4 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Total</td>
+                <td className="px-4 py-3 text-right text-red-600">
+                  {totPay > 0 ? `-₹${fmtCcy(totPay)}` : '—'}
+                </td>
+                <td className="px-4 py-3 text-right text-green-700">
+                  {totReceipt > 0 ? `+₹${fmtCcy(totReceipt)}` : '—'}
+                </td>
+                <td className={`px-4 py-3 text-right ${totDay >= 0 ? 'text-slate-800' : 'text-red-700'}`}>
+                  {totDay >= 0 ? '' : '-'}₹{fmtCcy(Math.abs(totDay))}
+                </td>
               </tr>
             </tfoot>
           </table>

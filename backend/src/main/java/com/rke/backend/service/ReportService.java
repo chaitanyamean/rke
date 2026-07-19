@@ -459,7 +459,9 @@ public class ReportService {
                     t.transaction_date::text,
                     COALESCE(SUM(CASE WHEN t.transaction_type = 'cash_payment' THEN t.grand_total END), 0),
                     COALESCE(SUM(CASE WHEN t.transaction_type = 'cash_receipt' THEN t.grand_total END), 0),
-                    COALESCE(SUM(t.grand_total), 0)
+                    COALESCE(SUM(CASE WHEN t.transaction_type = 'cash_receipt' THEN t.grand_total
+                                     WHEN t.transaction_type = 'cash_payment' THEN -t.grand_total
+                                END), 0)
                 FROM transactions t
                 WHERE t.tenant_id = :tenantId
                   AND t.transaction_type IN ('cash_payment','cash_receipt')
