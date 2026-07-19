@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rke.backend.dto.report.TransactionReportRow;
 import com.rke.backend.dto.report.FarmerOutstandingRow;
 import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
@@ -71,6 +72,16 @@ public class ReportsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
         return reportService.farmerOutstandings(villageId, fromDate, toDate);
+    }
+
+    /** Cross-farmer transaction list with item detail, filterable by date, farmer, and bill number. */
+    @GetMapping("/transactions")
+    public List<TransactionReportRow> transactionsReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) UUID farmerId,
+            @RequestParam(required = false) String billNumber) {
+        return reportService.transactionsReport(fromDate, toDate, farmerId, billNumber);
     }
 
     /** Net quantity and amount sold (sales minus returns) per item. */

@@ -13,6 +13,7 @@ import com.rke.backend.domain.ledger.TransactionClassifier;
 import com.rke.backend.dto.report.DashboardSummary;
 import com.rke.backend.dto.report.DatePaymentsRow;
 import com.rke.backend.dto.report.DateSalesRow;
+import com.rke.backend.dto.report.TransactionReportRow;
 import com.rke.backend.dto.report.FarmerOutstandingRow;
 import com.rke.backend.dto.report.FarmerLedgerRow;
 import com.rke.backend.dto.report.ItemSalesRow;
@@ -266,8 +267,91 @@ public class ReportService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // 2c. Transactions report — cross-farmer transaction list with item detail
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns all transactions matching the optional filters, one row per line
+     * item (or one row for payment/receipt transactions with no items).
+     * Excludes voided transactions. Ordered chronologically then by bill number.
+     */
+    @Transactional(readOnly = true)
+    public List<TransactionReportRow> transactionsReport(LocalDate fromDate,
+                                                          LocalDate toDate,
+                                                          UUID farmerId,
+                                                          String billNumber) {
+        UUID tenantId = currentUserService.getTenantId();
+        String cc = buildLedgerContributionCase();
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT\n" +
+                "    t.id::text,\n" +
+                "    t.transaction_date::text,\n" +
+                "    t.bill_number,\n" +
+                "    t.transaction_type,\n" +
+                "    f.name          AS farmer_name,\n" +
+                "    f.father_name,\n" +
+                "    ic.name         AS category_name,\n" +
+                "    i.name          AS item_name,\n" +
+                "    ti.quantity,\n" +
+                "    ti.price,\n" +
+                "    CASE WHEN (" + cc + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
+                "    CASE WHEN (" + cc + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount,\n" +
+                "    t.remarks\n" +
+                "FROM transactions t\n" +
+                "JOIN farmers f ON f.id = t.farmer_id AND f.tenant_id = :tenantId\n" +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id AND ti.tenant_id = :tenantId\n" +
+                "LEFT JOIN items i              ON i.id = ti.item_id\n" +
+                "LEFT JOIN item_categories ic   ON ic.id = i.item_category_id\n" +
+                "WHERE t.tenant_id = :tenantId\n" +
+                "  AND t.status = 'active'\n");
+
+        if (fromDate != null)   sql.append("  AND t.transaction_date >= :fromDate\n");
+        if (toDate != null)     sql.append("  AND t.transaction_date <= :toDate\n");
+        if (farmerId != null)   sql.append("  AND t.farmer_id = :farmerId\n");
+        if (billNumber != null && !billNumber.isBlank())
+                                sql.append("  AND t.bill_number ILIKE :billNumber\n");
+
+        sql.append("ORDER BY t.transaction_date, t.created_at, t.id, ic.name NULLS LAST, i.name NULLS LAST");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        query.setParameter("tenantId", tenantId);
+        if (fromDate != null)   query.setParameter("fromDate", fromDate);
+        if (toDate != null)     query.setParameter("toDate", toDate);
+        if (farmerId != null)   query.setParameter("farmerId", farmerId);
+        if (billNumber != null && !billNumber.isBlank())
+                                query.setParameter("billNumber", "%" + billNumber.trim() + "%");
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        return rows.stream().map(r -> {
+            String txType = str(r[3]);
+            TransactionType type = TransactionType.valueOf(txType.toUpperCase());
+            String direction = TransactionClassifier.classify(type).name();
+            return new TransactionReportRow(
+                    str(r[0]),       // transactionId
+                    str(r[1]),       // transactionDate
+                    str(r[2]),       // billNumber
+                    txType,          // transactionType
+                    direction,       // DEBIT or CREDIT
+                    str(r[4]),       // farmerName
+                    str(r[5]),       // fatherName
+                    str(r[6]),       // categoryName
+                    str(r[7]),       // itemName
+                    decimal(r[8]),   // quantity
+                    decimal(r[9]),   // price
+                    decimal(r[10]),  // debitAmount
+                    decimal(r[11]),  // creditAmount
+                    str(r[12])       // remarks
+            );
+        }).toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // 3. Item sales — net quantity/amount per item (sales minus returns)
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Returns net quantity and amount sold per item. Returns are included with
      * their negative amounts so the totals are net (SUM naturally deducts them).

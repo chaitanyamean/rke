@@ -253,10 +253,10 @@ export default function FarmerLedgerPage() {
                         </>
                       )}
 
-                      <td className="px-3 py-2.5 text-slate-500">{row.categoryName ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-700">{row.categoryName ?? '—'}</td>
                       <td className="px-3 py-2.5 text-slate-800">
                         {row.itemName ?? (
-                          <span className="italic text-slate-400">
+                          <span className="italic text-slate-500">
                             {first.transactionType === 'cash_payment' ? 'Payment' :
                              first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}
                           </span>
@@ -272,14 +272,14 @@ export default function FarmerLedgerPage() {
                           <td rowSpan={rowspan} className="px-3 py-2.5 text-right font-semibold align-top border-l border-slate-100">
                             {first.debitAmount > 0
                               ? <span className="text-red-600">₹{fmtCcy(first.debitAmount)}</span>
-                              : <span className="text-slate-300">—</span>}
+                              : <span className="text-slate-500">—</span>}
                           </td>
                           <td rowSpan={rowspan} className="px-3 py-2.5 text-right font-semibold align-top">
                             {first.creditAmount > 0
-                              ? <span className="text-green-600">+₹{fmtCcy(first.creditAmount)}</span>
-                              : <span className="text-slate-300">—</span>}
+                              ? <span className="text-green-700">+₹{fmtCcy(first.creditAmount)}</span>
+                              : <span className="text-slate-500">—</span>}
                           </td>
-                          <td rowSpan={rowspan} className="px-3 py-2.5 text-right text-slate-400 align-top">
+                          <td rowSpan={rowspan} className="px-3 py-2.5 text-right text-slate-600 align-top">
                             {fmtCcy(first.interestAmount)}
                           </td>
                           <td rowSpan={rowspan} className={`px-3 py-2.5 text-right font-bold align-top ${
@@ -288,7 +288,7 @@ export default function FarmerLedgerPage() {
                           }`}>
                             {fmtCcy(first.runningBalance)}
                           </td>
-                          <td rowSpan={rowspan} className="px-3 py-2.5 text-xs text-slate-500 align-top max-w-[160px]">
+                          <td rowSpan={rowspan} className="px-3 py-2.5 text-xs text-slate-600 align-top max-w-[160px]">
                             {first.remarks ?? ''}
                           </td>
                           {isAdmin && (

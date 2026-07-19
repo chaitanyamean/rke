@@ -95,7 +95,7 @@ export default function DashboardPage() {
         <section className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800">Recent Transactions</h2>
-            <Link to="/reports" className="text-sm font-medium text-blue-600 hover:underline">
+            <Link to="/reports/transactions" className="text-sm font-medium text-blue-600 hover:underline">
               View All Transactions
             </Link>
           </div>

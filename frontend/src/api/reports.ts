@@ -20,6 +20,23 @@ export interface FarmerLedgerRow {
   remarks: string | null
 }
 
+export interface TransactionReportRow {
+  transactionId: string
+  transactionDate: string
+  billNumber: string
+  transactionType: string
+  direction: 'DEBIT' | 'CREDIT'
+  farmerName: string
+  fatherName: string | null
+  categoryName: string | null
+  itemName: string | null
+  quantity: number | null
+  price: number | null
+  debitAmount: number
+  creditAmount: number
+  remarks: string | null
+}
+
 export interface FarmerOutstandingRow {
   farmerId: string
   farmerName: string
@@ -83,6 +100,24 @@ export function useFarmerLedger(
       ).data
     },
     enabled: enabled && !!farmerId,
+  })
+}
+
+export function useTransactionsReport(
+  filter: DateRangeFilter & { farmerId?: string; billNumber?: string },
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['report', 'transactions', filter],
+    queryFn: async () => {
+      const params: Record<string, string> = {}
+      if (filter.fromDate)   params.fromDate   = filter.fromDate
+      if (filter.toDate)     params.toDate     = filter.toDate
+      if (filter.farmerId)   params.farmerId   = filter.farmerId
+      if (filter.billNumber) params.billNumber = filter.billNumber
+      return (await api.get<TransactionReportRow[]>('/api/reports/transactions', { params })).data
+    },
+    enabled,
   })
 }
 

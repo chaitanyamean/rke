@@ -21,6 +21,7 @@ import PaymentEditPage from './pages/PaymentEditPage'
 import ReturnPage from './pages/ReturnPage'
 import ReturnEditPage from './pages/ReturnEditPage'
 import CottonLotPage from './pages/CottonLotPage'
+import TransactionsReportPage from './pages/reports/TransactionsReportPage'
 import ReportsLandingPage from './pages/reports/ReportsLandingPage'
 import FarmerLedgerPage from './pages/reports/FarmerLedgerPage'
 import VillageOutstandingsPage from './pages/reports/VillageOutstandingsPage'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/reports/item-sales" element={<ItemSalesPage />} />
           <Route path="/reports/date-sales" element={<DateSalesPage />} />
           <Route path="/reports/date-payments" element={<DatePaymentsPage />} />
+          <Route path="/reports/transactions" element={<TransactionsReportPage />} />
 
           {/* Admin-only */}
           <Route element={<AdminRoute />}>
