@@ -91,8 +91,8 @@ public class ReportService {
                 "        t.remarks,\n" +
                 "        t.created_at,\n" +
                 "        " + contributionCase + " AS signed_amount,\n" +
-                "        CASE WHEN (" + contributionCase + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
-                "        CASE WHEN (" + contributionCase + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount\n" +
+                "        CASE WHEN (" + contributionCase + ") < 0 THEN ABS(t.grand_total) ELSE 0 END AS debit_amount,\n" +
+                "        CASE WHEN (" + contributionCase + ") > 0 THEN ABS(t.grand_total) ELSE 0 END AS credit_amount\n" +
                 "    FROM transactions t\n" +
                 "    WHERE t.tenant_id = :tenantId\n" +
                 "      AND t.farmer_id = :farmerId\n" +
@@ -295,8 +295,8 @@ public class ReportService {
                 "    i.name          AS item_name,\n" +
                 "    ti.quantity,\n" +
                 "    ti.price,\n" +
-                "    CASE WHEN (" + cc + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
-                "    CASE WHEN (" + cc + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount,\n" +
+                "    CASE WHEN (" + cc + ") < 0 THEN ABS(t.grand_total) ELSE 0 END AS debit_amount,\n" +
+                "    CASE WHEN (" + cc + ") > 0 THEN ABS(t.grand_total) ELSE 0 END AS credit_amount,\n" +
                 "    t.remarks\n" +
                 "FROM transactions t\n" +
                 "JOIN farmers f ON f.id = t.farmer_id AND f.tenant_id = :tenantId\n" +

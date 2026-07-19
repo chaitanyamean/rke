@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useVillages } from '../api/villages'
 import { useFarmers } from '../api/farmers'
 import SearchSelect from './SearchSelect'
@@ -30,6 +30,15 @@ export default function FarmerSelector({ value, onChange, allowAddFarmer = true 
   const [name, setName] = useState(value?.name ?? '')
   const [farmerId, setFarmerId] = useState(value?.id ?? '')
   const [showAddFarmer, setShowAddFarmer] = useState(false)
+
+  // Sync internal state when the value prop resolves after initial mount
+  // (e.g. edit pages that load the farmer asynchronously).
+  useEffect(() => {
+    if (!value) return
+    setVillageId(value.villageId ?? '')
+    setName(value.name ?? '')
+    setFarmerId(value.id ?? '')
+  }, [value?.id])
 
   const { data: villages = [] } = useVillages()
   const { data: farmers = [], isLoading } = useFarmers({ villageId }, Boolean(villageId))
