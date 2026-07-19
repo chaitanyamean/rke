@@ -74,40 +74,59 @@ public class ReportService {
 
         String contributionCase = buildLedgerContributionCase();
 
-        // Window function over the transaction-level signed amount so each item
-        // row of the same transaction carries the same running balance.
+        // The running balance must be computed at transaction level (one contribution
+        // per transaction) before joining item rows — otherwise a sale with N items
+        // would add grand_total N times to the window sum.
+        // Strategy: CTE computes per-transaction signed amount + running balance,
+        // then we LEFT JOIN items back in for the line-item columns.
         String selectSql =
+                "WITH tx_contrib AS (\n" +
+                "    SELECT\n" +
+                "        t.id,\n" +
+                "        t.transaction_date,\n" +
+                "        t.bill_number,\n" +
+                "        t.transaction_type,\n" +
+                "        t.grand_total,\n" +
+                "        t.remarks,\n" +
+                "        t.created_at,\n" +
+                "        " + contributionCase + " AS signed_amount,\n" +
+                "        CASE WHEN (" + contributionCase + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
+                "        CASE WHEN (" + contributionCase + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount\n" +
+                "    FROM transactions t\n" +
+                "    WHERE t.tenant_id = :tenantId\n" +
+                "      AND t.farmer_id = :farmerId\n" +
+                (includeVoided ? "" : "      AND t.status = 'active'\n") +
+                (fromDate != null ? "      AND t.transaction_date >= :fromDate\n" : "") +
+                (toDate   != null ? "      AND t.transaction_date <= :toDate\n"   : "") +
+                "),\n" +
+                "tx_balance AS (\n" +
+                "    SELECT *,\n" +
+                "        SUM(signed_amount) OVER (\n" +
+                "            ORDER BY transaction_date, created_at, id\n" +
+                "            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n" +
+                "        ) AS running_balance\n" +
+                "    FROM tx_contrib\n" +
+                ")\n" +
                 "SELECT\n" +
-                "    t.id::text,\n" +
-                "    t.transaction_date::text,\n" +
-                "    t.bill_number,\n" +
-                "    t.transaction_type,\n" +
-                "    ic.name        AS category_name,\n" +
-                "    i.name         AS item_name,\n" +
+                "    tb.id::text,\n" +
+                "    tb.transaction_date::text,\n" +
+                "    tb.bill_number,\n" +
+                "    tb.transaction_type,\n" +
+                "    ic.name   AS category_name,\n" +
+                "    i.name    AS item_name,\n" +
                 "    ti.quantity,\n" +
                 "    ti.price,\n" +
-                "    CASE WHEN (" + contributionCase + ") < 0 THEN t.grand_total ELSE 0 END AS debit_amount,\n" +
-                "    CASE WHEN (" + contributionCase + ") > 0 THEN t.grand_total ELSE 0 END AS credit_amount,\n" +
-                "    SUM(" + contributionCase + ")" +
-                " OVER (ORDER BY t.transaction_date, t.created_at, t.id" +
-                " ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance,\n" +
-                "    t.remarks\n" +
-                "FROM transactions t\n" +
-                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id AND ti.tenant_id = :tenantId\n" +
+                "    tb.debit_amount,\n" +
+                "    tb.credit_amount,\n" +
+                "    tb.running_balance,\n" +
+                "    tb.remarks\n" +
+                "FROM tx_balance tb\n" +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = tb.id AND ti.tenant_id = :tenantId\n" +
                 "LEFT JOIN items i              ON i.id = ti.item_id\n" +
                 "LEFT JOIN item_categories ic   ON ic.id = i.item_category_id\n" +
-                "WHERE t.tenant_id = :tenantId\n" +
-                "  AND t.farmer_id = :farmerId\n";
+                "ORDER BY tb.transaction_date, tb.created_at, tb.id, ic.name NULLS LAST, i.name NULLS LAST";
 
-        StringBuilder sql = new StringBuilder(selectSql);
-
-        if (!includeVoided) sql.append(" AND t.status = 'active'\n");
-        if (fromDate != null) sql.append(" AND t.transaction_date >= :fromDate\n");
-        if (toDate != null)   sql.append(" AND t.transaction_date <= :toDate\n");
-
-        sql.append(" ORDER BY t.transaction_date, t.created_at, t.id, ic.name NULLS LAST, i.name NULLS LAST");
-
-        Query query = entityManager.createNativeQuery(sql.toString());
+        Query query = entityManager.createNativeQuery(selectSql);
         query.setParameter("tenantId", tenantId);
         query.setParameter("farmerId", farmerId);
         if (fromDate != null) query.setParameter("fromDate", fromDate);

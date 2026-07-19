@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Farmer } from '../../types'
 import { useFarmerLedger, type DateRangeFilter, type FarmerLedgerRow } from '../../api/reports'
@@ -49,7 +49,6 @@ function groupByTransaction(rows: FarmerLedgerRow[]): FarmerLedgerRow[][] {
 
 export default function FarmerLedgerPage() {
   const { isAdmin } = useAuth()
-  const printRef = useRef<HTMLDivElement>(null)
   const [farmer, setFarmer] = useState<Farmer | null>(null)
   const [draft, setDraft] = useState<DateRangeFilter>({
     fromDate: `${new Date().getFullYear()}-04-01`,
@@ -80,13 +79,41 @@ export default function FarmerLedgerPage() {
 
   // ── PDF print via a new window ──────────────────────────────────────────
   const printLedger = () => {
-    if (!printRef.current) return
     const farmerLabel = farmer
       ? `${farmer.name}${farmer.fatherName ? ' / ' + farmer.fatherName : ''}`
       : ''
     const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
     const printWindow = window.open('', '_blank', 'width=1200,height=850')
     if (!printWindow) return
+
+    const esc = (s: string | null | undefined) =>
+      (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    const rows = groups.flatMap((group) =>
+      group.map((row, itemIdx) => {
+        const first = group[0]
+        const isFirst = itemIdx === 0
+        const isDebit = first.direction === 'DEBIT'
+        const balClass = first.runningBalance < 0 ? 'bal-neg' : first.runningBalance > 0 ? 'bal-pos' : 'muted'
+        return `<tr>
+          <td>${esc(first.transactionDate)}</td>
+          <td style="font-family:monospace;font-size:9px">${esc(first.billNumber)}</td>
+          <td><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>
+          <td>${esc(row.categoryName)}</td>
+          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}</span>`}</td>
+          <td class="right">${fmtQty(row.quantity)}</td>
+          <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
+          <td class="right">${isFirst && first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : isFirst ? '<span class="muted">—</span>' : ''}</td>
+          <td class="right">${isFirst && first.creditAmount > 0 ? `<span class="credit">+₹${fmtCcy(first.creditAmount)}</span>` : isFirst ? '<span class="muted">—</span>' : ''}</td>
+          <td class="right">${isFirst ? fmtCcy(first.interestAmount) : ''}</td>
+          <td class="right ${balClass}">${isFirst ? fmtCcy(first.runningBalance) : ''}</td>
+          <td>${isFirst ? esc(first.remarks) : ''}</td>
+        </tr>`
+      })
+    ).join('')
+
+    const { label: closingLabel, direction: closingDir } = formatBalance(closingBalance)
+
     printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
@@ -109,18 +136,35 @@ export default function FarmerLedgerPage() {
     .bal-neg { color: #b91c1c; font-weight: 700; }
     .bal-pos { color: #15803d; font-weight: 700; }
     .muted  { color: #94a3b8; }
-    .badge  { display: inline-block; padding: 1px 5px; border-radius: 3px;
-              font-size: 9px; font-weight: 600; }
+    .badge  { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; }
     .badge-d { background: #fef2f2; color: #dc2626; }
     .badge-c { background: #f0fdf4; color: #16a34a; }
     @media print { @page { size: A4 landscape; margin: 12mm; } body { padding: 0; } }
-    .no-print { display: none; }
   </style>
 </head>
 <body>
   <h1>Farmer Ledger</h1>
   <p class="meta">Farmer: <strong>${farmerLabel}</strong> &nbsp;|&nbsp; Period: ${dateRange || 'All dates'}</p>
-  ${printRef.current.innerHTML}
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th><th>Bill Number</th><th>Type</th>
+        <th>Item Category</th><th>Items</th><th class="right">Qty</th><th class="right">Price (₹)</th>
+        <th class="right">Debit (₹)</th><th class="right">Credit (₹)</th>
+        <th class="right">Interest (₹)</th><th class="right">Balance (₹)</th><th>Remarks</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="7" class="right" style="font-size:9px;text-transform:uppercase;letter-spacing:0.04em;color:#475569">Totals</td>
+        <td class="right debit">₹${fmtCcy(totalDebit)}</td>
+        <td class="right credit">+₹${fmtCcy(totalCredit)}</td>
+        <td class="right">${fmtCcy(totalInterest)}</td>
+        <td colspan="2" class="right ${closingDir === 'owes' ? 'bal-neg' : closingDir === 'credit' ? 'bal-pos' : 'muted'}" style="font-size:13px">${closingLabel}</td>
+      </tr>
+    </tfoot>
+  </table>
   <script>window.onload = function(){ window.print(); }<\/script>
 </body>
 </html>`)
@@ -165,8 +209,8 @@ export default function FarmerLedgerPage() {
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No transactions found.</p>
       ) : (
-        // printRef wraps only the table so innerHTML captures clean table HTML
-        <div ref={printRef} className="overflow-x-auto">
+        // printRef kept for potential future use
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm border-collapse">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
@@ -175,8 +219,7 @@ export default function FarmerLedgerPage() {
                   'Item Category', 'Items', 'Qty', 'Price (₹)',
                   'Debit (₹)', 'Credit (₹)', 'Interest (₹)', 'Balance (₹)', 'Remarks',
                 ].concat(isAdmin ? [''] : []).map((h, i) => (
-                  <th key={i} className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap${i === 11 && isAdmin ? ' no-print' : ''}`}>{h}</th>
-                ))}
+                  <th key={i} className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap${i === 12 && isAdmin ? ' no-print' : ''}`}>{h}</th>                ))}
               </tr>
             </thead>
             <tbody>
