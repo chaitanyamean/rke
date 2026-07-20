@@ -2,9 +2,11 @@ package com.rke.backend.service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -273,6 +275,15 @@ public class SalesService {
      */
     private List<PricedLine> validateAndPriceLines(List<SaleLineItemRequest> lineRequests,
                                                     TransactionType type) {
+        // Reject duplicate items in the same sale.
+        Set<UUID> seen = new HashSet<>();
+        for (SaleLineItemRequest req : lineRequests) {
+            if (!seen.add(req.itemId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Duplicate item in sale: " + req.itemId());
+            }
+        }
+
         List<UUID> missing = new ArrayList<>();
         List<PricedLine> result = new ArrayList<>(lineRequests.size());
 

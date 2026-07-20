@@ -11,13 +11,15 @@ import SearchSelect from './SearchSelect'
 type SaleType = 'cash' | 'credit'
 
 interface LineItem {
+  key: number
   itemId: string
   quantity: string
   price: string
 }
 
+let lineKeyCounter = 0
 function emptyLine(): LineItem {
-  return { itemId: '', quantity: '1', price: '' }
+  return { key: ++lineKeyCounter, itemId: '', quantity: '1', price: '' }
 }
 
 function today(): string {
@@ -111,6 +113,11 @@ export default function SaleForm({ saleType }: Props) {
     }, 0)
   }, [lines])
 
+  const hasDuplicateItems = useMemo(() => {
+    const ids = lines.map((l) => l.itemId).filter(Boolean)
+    return ids.length !== new Set(ids).size
+  }, [lines])
+
   const isFormComplete =
     farmer &&
     categoryId &&
@@ -119,11 +126,16 @@ export default function SaleForm({ saleType }: Props) {
     txDate &&
     txDate <= today() &&
     lines.length > 0 &&
-    lines.every((l) => l.itemId && parseFloat(l.quantity) > 0 && parseFloat(l.price) >= 0)
+    lines.every((l) => l.itemId && parseFloat(l.quantity) > 0 && parseFloat(l.price) >= 0) &&
+    !hasDuplicateItems
 
   const handleEnd = () => {
     if (txDate > today()) {
       setError('Transaction date cannot be in the future.')
+      return
+    }
+    if (hasDuplicateItems) {
+      setError('Each item can only be added once. Remove duplicate items before continuing.')
       return
     }
     if (!isFormComplete) {
@@ -400,23 +412,34 @@ export default function SaleForm({ saleType }: Props) {
         </h2>
 
         <div className="space-y-3">
-          {lines.map((line, idx) => (
-            <LineRow
-              key={idx}
-              line={line}
-              items={categoryItems}
-              onItemChange={(id) => handleItemChange(idx, id)}
-              onQtyChange={(q) => handleQtyChange(idx, q)}
-              onPriceChange={(p) => handlePriceChange(idx, p)}
-              onRemove={lines.length > 1 ? () => setLines((l) => l.filter((_, i) => i !== idx)) : undefined}
-            />
-          ))}
+          {lines.map((line, idx) => {
+            // Items already chosen in other rows (exclude current row)
+            const takenItemIds = new Set(
+              lines.filter((_, i) => i !== idx).map((l) => l.itemId).filter(Boolean)
+            )
+            const availableItems = categoryItems.filter(
+              (i) => !takenItemIds.has(i.id) || i.id === line.itemId
+            )
+            const isDuplicate = Boolean(line.itemId && takenItemIds.has(line.itemId))
+            return (
+              <LineRow
+                key={line.key}
+                line={line}
+                items={availableItems}
+                isDuplicate={isDuplicate}
+                onItemChange={(id) => handleItemChange(idx, id)}
+                onQtyChange={(q) => handleQtyChange(idx, q)}
+                onPriceChange={(p) => handlePriceChange(idx, p)}
+                onRemove={lines.length > 1 ? () => setLines((l) => l.filter((_, i) => i !== idx)) : undefined}
+              />
+            )
+          })}
         </div>
 
         <button
           type="button"
           onClick={() => setLines((l) => [...l, emptyLine()])}
-          disabled={!categoryId}
+          disabled={!categoryId || lines.length >= categoryItems.length}
           className="mt-3 rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           + Add Item
@@ -468,21 +491,23 @@ function Row({ label, value }: { label: string; value: string }) {
 interface LineRowProps {
   line: LineItem
   items: Item[]
+  isDuplicate?: boolean
   onItemChange: (id: string) => void
   onQtyChange: (q: string) => void
   onPriceChange: (p: string) => void
   onRemove?: () => void
 }
 
-function LineRow({ line, items, onItemChange, onQtyChange, onPriceChange: _onPriceChange, onRemove }: LineRowProps) {
+function LineRow({ line, items, isDuplicate = false, onItemChange, onQtyChange, onPriceChange: _onPriceChange, onRemove }: LineRowProps) {
   const amount = (parseFloat(line.quantity) || 0) * (parseFloat(line.price) || 0)
   const itemOptions = useMemo(() => items.map((i) => ({ id: i.id, label: i.name })), [items])
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
+    <div className={`flex flex-wrap items-end gap-2 rounded-md p-1 ${isDuplicate ? 'bg-red-50 ring-1 ring-red-300' : ''}`}>
       <div className="flex-1 min-w-[160px]">
         <span className="mb-1 block text-xs font-medium text-slate-500">
           Item <span className="text-red-500">*</span>
+          {isDuplicate && <span className="ml-2 text-red-500 font-semibold">— duplicate</span>}
         </span>
         <SearchSelect
           options={itemOptions}
