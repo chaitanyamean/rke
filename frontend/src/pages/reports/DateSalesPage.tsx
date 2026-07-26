@@ -43,7 +43,7 @@ export default function DateSalesPage() {
         <td class="right">₹${fmtCcy(totDay)}</td>
       </tr></tfoot>
     </table>`
-    printReport('Sales Summary', `Period: ${dateRange || 'All dates'}`, table)
+    printReport('Sales Summary', `Period: ${dateRange || 'All dates'}`, table, `Sales Summary${dateRange ? ' - ' + dateRange : ''}`)
   }
 
   const filters = (

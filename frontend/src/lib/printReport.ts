@@ -1,8 +1,14 @@
 /**
  * Opens a print-ready HTML page in a new window and triggers window.print().
  * Used by all report pages for "Download PDF" (save-as-PDF via browser print dialog).
+ *
+ * @param title     Heading shown inside the printed page (h1)
+ * @param subtitle  Sub-line shown below the heading (supports safe HTML)
+ * @param tableHtml The table HTML to embed
+ * @param filename  Optional: overrides the browser's suggested save filename (window title).
+ *                  If omitted, falls back to title.
  */
-export function printReport(title: string, subtitle: string, tableHtml: string) {
+export function printReport(title: string, subtitle: string, tableHtml: string, filename?: string) {
   const win = window.open('', '_blank', 'width=1200,height=850')
   if (!win) return
 
@@ -10,7 +16,7 @@ export function printReport(title: string, subtitle: string, tableHtml: string) 
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${esc(title)}</title>
+  <title>${esc(filename ?? title)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 24px; }

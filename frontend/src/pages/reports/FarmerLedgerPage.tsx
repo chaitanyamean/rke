@@ -137,6 +137,7 @@ export default function FarmerLedgerPage() {
       'Farmer Ledger',
       `Farmer: <strong>${esc(farmerLabel)}</strong> &nbsp;|&nbsp; Period: ${dateRange || 'All dates'}`,
       table,
+      `Farmer Ledger - ${farmerLabel}${dateRange ? ' - ' + dateRange : ''}`,
     )
   }
 

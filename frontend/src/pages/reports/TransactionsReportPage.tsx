@@ -109,7 +109,7 @@ export default function TransactionsReportPage() {
         <td></td>
       </tr></tfoot>
     </table>`
-    printReport('Transactions', `Period: ${dateRange || 'All dates'}`, table)
+    printReport('Transactions', `Period: ${dateRange || 'All dates'}`, table, `Transactions${dateRange ? ' - ' + dateRange : ''}`)
   }
 
   const filters = (

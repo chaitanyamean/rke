@@ -39,7 +39,7 @@ export default function DatePaymentsPage() {
         <td class="right">${totDay >= 0 ? '' : '-'}₹${fmtCcy(Math.abs(totDay))}</td>
       </tr></tfoot>
     </table>`
-    printReport('Payments & Receipts', `Period: ${dateRange || 'All dates'}`, table)
+    printReport('Payments & Receipts', `Period: ${dateRange || 'All dates'}`, table, `Payments & Receipts${dateRange ? ' - ' + dateRange : ''}`)
   }
   const filters = (
     <>

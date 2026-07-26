@@ -52,7 +52,7 @@ export default function VillageOutstandingsPage() {
         <td class="right ${totCls}">${totLabel}</td>
       </tr></tfoot>
     </table>`
-    printReport('Village Outstandings', `Period: ${dateRange || 'All dates'}`, table)
+    printReport('Village Outstandings', `Period: ${dateRange || 'All dates'}`, table, `Village Outstandings${dateRange ? ' - ' + dateRange : ''}`)
   }
 
   const filters = (
