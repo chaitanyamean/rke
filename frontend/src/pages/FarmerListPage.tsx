@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useFarmers } from '../api/farmers'
 import { useVillages } from '../api/villages'
+import { useAuth } from '../auth/AuthContext'
 import EditFarmerModal from '../components/EditFarmerModal'
 import type { Farmer } from '../types'
 
 export default function FarmerListPage() {
+  const { isAdmin } = useAuth()
   const [name, setName] = useState('')
   const [fatherName, setFatherName] = useState('')
   const [villageId, setVillageId] = useState('')
@@ -24,12 +26,14 @@ export default function FarmerListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Farmers</h1>
-        <Link
-          to="/farmers/new"
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          + Register farmer
-        </Link>
+        {isAdmin && (
+          <Link
+            to="/farmers/new"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            + Register farmer
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4">
@@ -65,18 +69,18 @@ export default function FarmerListPage() {
               <th className="px-4 py-2 font-medium">Village</th>
               <th className="px-4 py-2 font-medium">Mobile</th>
               <th className="px-4 py-2 font-medium">Address</th>
-              <th className="px-4 py-2 font-medium">Actions</th>
+              {isAdmin && <th className="px-4 py-2 font-medium">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td>
+                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-6 text-center text-slate-400">Loading…</td>
               </tr>
             )}
             {!isLoading && farmers.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">No farmers found</td>
+                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-6 text-center text-slate-400">No farmers found</td>
               </tr>
             )}
             {farmers.map((f) => (
@@ -86,15 +90,17 @@ export default function FarmerListPage() {
                 <td className="px-4 py-2 text-slate-500">{villageName(f.villageId)}</td>
                 <td className="px-4 py-2 text-slate-500">{f.mobileNumber ?? '—'}</td>
                 <td className="px-4 py-2 text-slate-500">{f.address ?? '—'}</td>
-                <td className="px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingFarmer(f)}
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    Edit
-                  </button>
-                </td>
+                {isAdmin && (
+                  <td className="px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingFarmer(f)}
+                      className="text-sm font-medium text-blue-600 hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
