@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTransactionsReport, type DateRangeFilter, type TransactionReportRow } from '../../api/reports'
 import { useAuth } from '../../auth/AuthContext'
 import ReportShell from '../../components/ReportShell'
+import { printReport, esc } from '../../lib/printReport'
 
 function editPathFor(transactionType: string, transactionId: string): string | null {
   switch (transactionType) {
@@ -29,9 +30,7 @@ function fmtQty(n: number | null) {
 }
 
 function financialYearStart(): string {
-  const today = new Date()
-  const year = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1
-  return `${year}-04-01`
+  return '2026-04-01'
 }
 
 /** Group flat rows by transactionId, preserving order. */
@@ -63,8 +62,55 @@ export default function TransactionsReportPage() {
   const { data = [], isLoading } = useTransactionsReport(active, true)
   const groups = groupByTransaction(data)
 
+  const totalDebit  = groups.map(g => g[0]).reduce((s, r) => s + r.debitAmount, 0)
+  const totalCredit = groups.map(g => g[0]).reduce((s, r) => s + r.creditAmount, 0)
+
   // All fields are optional — Run Report always fires with whatever is filled in
   const run = () => setActive({ ...draft })
+
+  const handlePrint = () => {
+    const dateRange = [active.fromDate, active.toDate].filter(Boolean).join(' to ')
+    const rows = groups.flatMap((group) =>
+      group.map((row, itemIdx) => {
+        const first = group[0]
+        const isFirst = itemIdx === 0
+        const rs = group.length
+        const isDebit = first.direction === 'DEBIT'
+        const spanAttr = rs > 1 ? ` rowspan="${rs}"` : ''
+        return `<tr>
+          ${isFirst ? `<td${spanAttr}>${esc(first.transactionDate)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} style="font-family:monospace;font-size:9px">${esc(first.billNumber)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr}>${esc(first.farmerName)}${first.fatherName ? `<br/><span style="color:#94a3b8;font-size:9px">${esc(first.fatherName)}</span>` : ''}</td>` : ''}
+          ${isFirst ? `<td${spanAttr}><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>` : ''}
+          <td>${esc(row.categoryName)}</td>
+          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}</span>`}</td>
+          <td class="right">${fmtQty(row.quantity)}</td>
+          <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
+          ${isFirst ? `<td${spanAttr} class="right">${first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} class="right">${first.creditAmount > 0 ? `<span class="credit">+₹${fmtCcy(first.creditAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+          ${isFirst ? `<td${spanAttr}>${esc(first.remarks)}</td>` : ''}
+        </tr>`
+      })
+    ).join('')
+    const table = `<table>
+      <thead><tr>
+        <th>Date</th><th>Bill Number</th><th>Farmer</th><th>Type</th>
+        <th>Item Category</th><th>Items</th>
+        <th class="right">Qty</th><th class="right">Price (₹)</th>
+        <th class="right">Debit (₹)</th><th class="right">Credit (₹)</th><th>Remarks</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td colspan="8" class="right" style="font-size:9px;text-transform:uppercase;letter-spacing:0.04em;color:#475569">
+          ${groups.length} transaction${groups.length !== 1 ? 's' : ''}
+        </td>
+        <td class="right debit">₹${fmtCcy(totalDebit)}</td>
+        <td class="right credit">+₹${fmtCcy(totalCredit)}</td>
+        <td></td>
+      </tr></tfoot>
+    </table>`
+    printReport('Transactions', `Period: ${dateRange || 'All dates'}`, table)
+  }
 
   const filters = (
     <>
@@ -93,7 +139,14 @@ export default function TransactionsReportPage() {
 
   return (
     <ReportShell title="Transactions" filters={filters} onRun={run}
-      isLoading={isLoading} ran={true}>
+      isLoading={isLoading} ran={true}
+      actions={data.length > 0 ? (
+        <button onClick={handlePrint}
+          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+          ⬇ Download PDF
+        </button>
+      ) : undefined}
+    >
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No transactions found.</p>
       ) : (
@@ -196,10 +249,10 @@ export default function TransactionsReportPage() {
                   {groups.length} transaction{groups.length !== 1 ? 's' : ''}
                 </td>
                 <td className="px-3 py-3 text-right text-red-700">
-                  ₹{fmtCcy(groups.map(g => g[0]).reduce((s, r) => s + r.debitAmount, 0))}
+                  ₹{fmtCcy(totalDebit)}
                 </td>
                 <td className="px-3 py-3 text-right text-green-700">
-                  +₹{fmtCcy(groups.map(g => g[0]).reduce((s, r) => s + r.creditAmount, 0))}
+                  +₹{fmtCcy(totalCredit)}
                 </td>
                 <td colSpan={isAdmin ? 2 : 1} />
               </tr>

@@ -6,7 +6,7 @@ const REPORTS = [
   { to: '/reports/item-sales',           label: 'Item Sales',           desc: 'Net quantity and amount sold per item, filterable by category and date.' },
   { to: '/reports/date-sales',           label: 'Sales Summary',        desc: 'Day-by-day sales totals with cash vs credit breakdown and returns.' },
   { to: '/reports/transactions',         label: 'Transactions',         desc: 'Search and filter all transactions across farmers by date, farmer, and bill number.' },
-  { to: '/reports/date-payments',        label: 'Daily Payments',       desc: 'Day-by-day payment and receipt totals.' },
+  { to: '/reports/date-payments',        label: 'Payments',       desc: 'Payment and receipt totals.' },
 ]
 
 export default function ReportsLandingPage() {

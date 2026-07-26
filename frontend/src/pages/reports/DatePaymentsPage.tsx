@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDatePayments, type DateRangeFilter } from '../../api/reports'
 import ReportShell from '../../components/ReportShell'
+import { printReport } from '../../lib/printReport'
 
 function fmtCcy(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -8,14 +9,38 @@ function fmtCcy(n: number) {
 
 export default function DatePaymentsPage() {
   const today = new Date().toISOString().slice(0, 10)
-  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: today, toDate: today, includeVoided: false })
-  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: today, toDate: today, includeVoided: false })
+  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '2026-04-01', toDate: today, includeVoided: false })
+  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: '2026-04-01', toDate: today, includeVoided: false })
 
   const { data = [], isLoading } = useDatePayments(active ?? {}, !!active)
 
   const totPay     = data.reduce((s, r) => s + r.paymentsTotal, 0)
   const totReceipt = data.reduce((s, r) => s + r.receiptsTotal, 0)
   const totDay     = data.reduce((s, r) => s + r.dayTotal, 0)
+
+  const handlePrint = () => {
+    const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
+    const rows = data.map(r => `<tr>
+      <td>${r.date}</td>
+      <td class="right debit">${r.paymentsTotal > 0 ? `-₹${fmtCcy(r.paymentsTotal)}` : '—'}</td>
+      <td class="right credit">${r.receiptsTotal > 0 ? `+₹${fmtCcy(r.receiptsTotal)}` : '—'}</td>
+      <td class="right">${r.dayTotal >= 0 ? '' : '-'}₹${fmtCcy(Math.abs(r.dayTotal))}</td>
+    </tr>`).join('')
+    const table = `<table>
+      <thead><tr>
+        <th>Date</th><th class="right">Payments (₹)</th>
+        <th class="right">Receipts (₹)</th><th class="right">Day Total (₹)</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>Total</td>
+        <td class="right debit">${totPay > 0 ? `-₹${fmtCcy(totPay)}` : '—'}</td>
+        <td class="right credit">${totReceipt > 0 ? `+₹${fmtCcy(totReceipt)}` : '—'}</td>
+        <td class="right">${totDay >= 0 ? '' : '-'}₹${fmtCcy(Math.abs(totDay))}</td>
+      </tr></tfoot>
+    </table>`
+    printReport('Payments & Receipts', `Period: ${dateRange || 'All dates'}`, table)
+  }
   const filters = (
     <>
       <label className="block">
@@ -40,8 +65,15 @@ export default function DatePaymentsPage() {
   )
 
   return (
-    <ReportShell title="Daily Payments & Receipts" filters={filters}
-      onRun={() => setActive({ ...draft })} isLoading={isLoading} ran={!!active}>
+    <ReportShell title="Payments & Receipts" filters={filters}
+      onRun={() => setActive({ ...draft })} isLoading={isLoading} ran={!!active}
+      actions={data.length > 0 ? (
+        <button onClick={handlePrint}
+          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+          ⬇ Download PDF
+        </button>
+      ) : undefined}
+    >
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No data found.</p>
       ) : (

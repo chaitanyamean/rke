@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom'
 import type { Farmer } from '../../types'
 import { useFarmerLedger, type DateRangeFilter, type FarmerLedgerRow } from '../../api/reports'
 import { useAuth } from '../../auth/AuthContext'
+import { useVillages } from '../../api/villages'
 import FarmerSelector from '../../components/FarmerSelector'
 import ReportShell from '../../components/ReportShell'
 import { formatBalance } from '../../lib/balance'
+import { printReport, esc } from '../../lib/printReport'
 
 function editPathFor(transactionType: string, transactionId: string): string | null {
   switch (transactionType) {
@@ -49,9 +51,10 @@ function groupByTransaction(rows: FarmerLedgerRow[]): FarmerLedgerRow[][] {
 
 export default function FarmerLedgerPage() {
   const { isAdmin } = useAuth()
+  const { data: villages = [] } = useVillages()
   const [farmer, setFarmer] = useState<Farmer | null>(null)
   const [draft, setDraft] = useState<DateRangeFilter>({
-    fromDate: `${new Date().getFullYear()}-04-01`,
+    fromDate: '2026-04-01',
     toDate: new Date().toISOString().slice(0, 10),
     includeVoided: false,
   })
@@ -79,100 +82,66 @@ export default function FarmerLedgerPage() {
 
   // ── PDF print via a new window ──────────────────────────────────────────
   const printLedger = () => {
+    const villageName = farmer ? (villages.find(v => v.id === farmer.villageId)?.name ?? '') : ''
     const farmerLabel = farmer
-      ? `${farmer.name}${farmer.fatherName ? ' / ' + farmer.fatherName : ''}`
+      ? [farmer.name, farmer.fatherName, villageName].filter(Boolean).join(' / ')
       : ''
     const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
-    const printWindow = window.open('', '_blank', 'width=1200,height=850')
-    if (!printWindow) return
-
-    const esc = (s: string | null | undefined) =>
-      (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
     const rows = groups.flatMap((group) =>
       group.map((row, itemIdx) => {
         const first = group[0]
         const isFirst = itemIdx === 0
+        const rs = group.length  // rowspan value
         const isDebit = first.direction === 'DEBIT'
         const balClass = first.runningBalance < 0 ? 'bal-neg' : first.runningBalance > 0 ? 'bal-pos' : 'muted'
+        const spanAttr = rs > 1 ? ` rowspan="${rs}"` : ''
         return `<tr>
-          <td>${esc(first.transactionDate)}</td>
-          <td style="font-family:monospace;font-size:9px">${esc(first.billNumber)}</td>
-          <td><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>
+          ${isFirst ? `<td${spanAttr}>${esc(first.transactionDate)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} style="font-family:monospace;font-size:9px">${esc(first.billNumber)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr}><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>` : ''}
           <td>${esc(row.categoryName)}</td>
           <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}</span>`}</td>
           <td class="right">${fmtQty(row.quantity)}</td>
           <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
-          <td class="right">${isFirst && first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : isFirst ? '<span class="muted">—</span>' : ''}</td>
-          <td class="right">${isFirst && first.creditAmount > 0 ? `<span class="credit">+₹${fmtCcy(first.creditAmount)}</span>` : isFirst ? '<span class="muted">—</span>' : ''}</td>
-          <td class="right">${isFirst ? fmtCcy(first.interestAmount) : ''}</td>
-          <td class="right ${balClass}">${isFirst ? fmtCcy(first.runningBalance) : ''}</td>
-          <td>${isFirst ? esc(first.remarks) : ''}</td>
+          ${isFirst ? `<td${spanAttr} class="right">${first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} class="right">${first.creditAmount > 0 ? `<span class="credit">+₹${fmtCcy(first.creditAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} class="right">${fmtCcy(first.interestAmount)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} class="right ${balClass}">${fmtCcy(first.runningBalance)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr}>${esc(first.remarks)}</td>` : ''}
         </tr>`
       })
     ).join('')
 
     const { label: closingLabel, direction: closingDir } = formatBalance(closingBalance)
+    const closingCls = closingDir === 'owes' ? 'bal-neg' : closingDir === 'credit' ? 'bal-pos' : 'muted'
 
-    printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Farmer Ledger — ${farmerLabel}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 24px; }
-    h1  { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
-    .meta { font-size: 10px; color: #64748b; margin-bottom: 14px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 7px;
-         font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em;
-         color: #475569; text-align: left; white-space: nowrap; }
-    td { border: 1px solid #e2e8f0; padding: 4px 7px; vertical-align: top; font-size: 10px; }
-    tfoot td { background: #f1f5f9; font-weight: 700; border-top: 2px solid #94a3b8; }
-    .right  { text-align: right; }
-    .debit  { color: #dc2626; }
-    .credit { color: #16a34a; }
-    .bal-neg { color: #b91c1c; font-weight: 700; }
-    .bal-pos { color: #15803d; font-weight: 700; }
-    .muted  { color: #94a3b8; }
-    .badge  { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; }
-    .badge-d { background: #fef2f2; color: #dc2626; }
-    .badge-c { background: #f0fdf4; color: #16a34a; }
-    @media print { @page { size: A4 landscape; margin: 12mm; } body { padding: 0; } }
-  </style>
-</head>
-<body>
-  <h1>Farmer Ledger</h1>
-  <p class="meta">Farmer: <strong>${farmerLabel}</strong> &nbsp;|&nbsp; Period: ${dateRange || 'All dates'}</p>
-  <table>
-    <thead>
-      <tr>
+    const table = `<table>
+      <thead><tr>
         <th>Date</th><th>Bill Number</th><th>Type</th>
         <th>Item Category</th><th>Items</th><th class="right">Qty</th><th class="right">Price (₹)</th>
         <th class="right">Debit (₹)</th><th class="right">Credit (₹)</th>
         <th class="right">Interest (₹)</th><th class="right">Balance (₹)</th><th>Remarks</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-    <tfoot>
-      <tr>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
         <td colspan="7" class="right" style="font-size:9px;text-transform:uppercase;letter-spacing:0.04em;color:#475569">Totals</td>
         <td class="right debit">₹${fmtCcy(totalDebit)}</td>
         <td class="right credit">+₹${fmtCcy(totalCredit)}</td>
         <td class="right">${fmtCcy(totalInterest)}</td>
-        <td colspan="2" class="right ${closingDir === 'owes' ? 'bal-neg' : closingDir === 'credit' ? 'bal-pos' : 'muted'}" style="font-size:13px">${closingLabel}</td>
-      </tr>
-    </tfoot>
-  </table>
-  <script>window.onload = function(){ window.print(); }<\/script>
-</body>
-</html>`)
-    printWindow.document.close()
+        <td colspan="2" class="right ${closingCls}" style="font-size:13px">${closingLabel}</td>
+      </tr></tfoot>
+    </table>`
+
+    printReport(
+      'Farmer Ledger',
+      `Farmer: <strong>${esc(farmerLabel)}</strong> &nbsp;|&nbsp; Period: ${dateRange || 'All dates'}`,
+      table,
+    )
   }
 
-  // ── actions slot (admin-only, only when data is present) ────────────────
-  const pdfButton = isAdmin && data.length > 0 ? (
+  // ── actions slot (only when data is present) ────────────────────────────
+  const pdfButton = data.length > 0 ? (
     <button
       onClick={printLedger}
       className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"

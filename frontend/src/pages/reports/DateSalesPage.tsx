@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDateSales, type DateRangeFilter } from '../../api/reports'
 import ReportShell from '../../components/ReportShell'
+import { printReport } from '../../lib/printReport'
 
 function fmtCcy(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -8,8 +9,8 @@ function fmtCcy(n: number) {
 
 export default function DateSalesPage() {
   const today = new Date().toISOString().slice(0, 10)
-  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: today, toDate: today, includeVoided: false })
-  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: today, toDate: today, includeVoided: false })
+  const [draft, setDraft] = useState<DateRangeFilter>({ fromDate: '2026-04-01', toDate: today, includeVoided: false })
+  const [active, setActive] = useState<DateRangeFilter | null>({ fromDate: '2026-04-01', toDate: today, includeVoided: false })
 
   const { data = [], isLoading } = useDateSales(active ?? {}, !!active)
 
@@ -17,6 +18,33 @@ export default function DateSalesPage() {
   const totCredit  = data.reduce((s, r) => s + r.creditSalesTotal, 0)
   const totReturns = data.reduce((s, r) => s + r.returnsTotal, 0)
   const totDay     = data.reduce((s, r) => s + r.dayTotal, 0)
+
+  const handlePrint = () => {
+    const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
+    const rows = data.map(r => `<tr>
+      <td>${r.date}</td>
+      <td class="right">${fmtCcy(r.cashSalesTotal)}</td>
+      <td class="right">${fmtCcy(r.creditSalesTotal)}</td>
+      <td class="right">${r.returnsTotal > 0 ? `-${fmtCcy(r.returnsTotal)}` : '—'}</td>
+      <td class="right">${fmtCcy(r.dayTotal)}</td>
+    </tr>`).join('')
+    const table = `<table>
+      <thead><tr>
+        <th>Date</th><th class="right">Cash Sales (₹)</th>
+        <th class="right">Credit Sales (₹)</th><th class="right">Returns (₹)</th>
+        <th class="right">Day Total (₹)</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td class="right">Total</td>
+        <td class="right">₹${fmtCcy(totCash)}</td>
+        <td class="right">₹${fmtCcy(totCredit)}</td>
+        <td class="right">${totReturns > 0 ? `-₹${fmtCcy(totReturns)}` : '—'}</td>
+        <td class="right">₹${fmtCcy(totDay)}</td>
+      </tr></tfoot>
+    </table>`
+    printReport('Sales Summary', `Period: ${dateRange || 'All dates'}`, table)
+  }
 
   const filters = (
     <>
@@ -43,7 +71,14 @@ export default function DateSalesPage() {
 
   return (
     <ReportShell title="Sales Summary" filters={filters} onRun={() => setActive({ ...draft })}
-      isLoading={isLoading} ran={!!active}>
+      isLoading={isLoading} ran={!!active}
+      actions={data.length > 0 ? (
+        <button onClick={handlePrint}
+          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+          ⬇ Download PDF
+        </button>
+      ) : undefined}
+    >
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No data found.</p>
       ) : (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useItemCategories } from '../../api/itemCategories'
 import { useItemSales, type DateRangeFilter } from '../../api/reports'
 import ReportShell from '../../components/ReportShell'
+import { printReport, esc } from '../../lib/printReport'
 
 function fmtQty(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -13,10 +14,10 @@ function fmtCcy(n: number) {
 export default function ItemSalesPage() {
   const today = new Date().toISOString().slice(0, 10)
   const [draft, setDraft] = useState<DateRangeFilter & { categoryId?: string }>({
-    fromDate: today, toDate: today, includeVoided: false, categoryId: '',
+    fromDate: '2026-04-01', toDate: today, includeVoided: false, categoryId: '',
   })
   const [active, setActive] = useState<typeof draft | null>({
-    fromDate: today, toDate: today, includeVoided: false, categoryId: '',
+    fromDate: '2026-04-01', toDate: today, includeVoided: false, categoryId: '',
   })
 
   const { data: categories = [] } = useItemCategories()
@@ -26,6 +27,29 @@ export default function ItemSalesPage() {
 
   const totQty = data.reduce((s, r) => s + r.totalQuantity, 0)
   const totAmt = data.reduce((s, r) => s + r.totalAmount, 0)
+
+  const handlePrint = () => {
+    const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
+    const rows = data.map(r => `<tr>
+      <td>${esc(r.categoryName)}</td>
+      <td>${esc(r.itemName)}</td>
+      <td class="right">${fmtQty(r.totalQuantity)}</td>
+      <td class="right">${fmtCcy(r.totalAmount)}</td>
+    </tr>`).join('')
+    const table = `<table>
+      <thead><tr>
+        <th>Category</th><th>Item</th>
+        <th class="right">Net Qty</th><th class="right">Net Amount (₹)</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td colspan="2" class="right">Total</td>
+        <td class="right">${fmtQty(totQty)}</td>
+        <td class="right">₹${fmtCcy(totAmt)}</td>
+      </tr></tfoot>
+    </table>`
+    printReport('Item Sales', `Period: ${dateRange || 'All dates'}`, table)
+  }
 
   const filters = (
     <>
@@ -60,7 +84,14 @@ export default function ItemSalesPage() {
   )
 
   return (
-    <ReportShell title="Item Sales" filters={filters} onRun={run} isLoading={isLoading} ran={!!active}>
+    <ReportShell title="Item Sales" filters={filters} onRun={run} isLoading={isLoading} ran={!!active}
+      actions={data.length > 0 ? (
+        <button onClick={handlePrint}
+          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+          ⬇ Download PDF
+        </button>
+      ) : undefined}
+    >
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No data found.</p>
       ) : (

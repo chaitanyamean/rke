@@ -3,24 +3,19 @@ import { useVillages } from '../../api/villages'
 import { useFarmerOutstandings, type DateRangeFilter } from '../../api/reports'
 import ReportShell from '../../components/ReportShell'
 import { formatBalance } from '../../lib/balance'
-
-function financialYearStart(): string {
-  const today = new Date()
-  const year = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1
-  return `${year}-04-01`
-}
+import { printReport, esc } from '../../lib/printReport'
 
 type Filter = DateRangeFilter & { villageId?: string }
 
 export default function VillageOutstandingsPage() {
   const today = new Date().toISOString().slice(0, 10)
   const [draft, setDraft] = useState<Filter>({
-    fromDate: financialYearStart(),
+    fromDate: '2026-04-01',
     toDate: today,
     villageId: '',
   })
   const [active, setActive] = useState<Filter>({
-    fromDate: financialYearStart(),
+    fromDate: '2026-04-01',
     toDate: today,
     villageId: '',
   })
@@ -32,6 +27,33 @@ export default function VillageOutstandingsPage() {
 
   const grandTotal = data.reduce((s, r) => s + r.outstandingBalance, 0)
   const { label: totalLabel, direction: totalDir } = formatBalance(grandTotal)
+
+  const handlePrint = () => {
+    const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
+    const rows = data.map(r => {
+      const { label, direction } = formatBalance(r.outstandingBalance)
+      const cls = direction === 'owes' ? 'debit' : direction === 'credit' ? 'credit' : 'muted'
+      return `<tr>
+        <td>${esc(r.farmerName)}</td>
+        <td>${esc(r.fatherName)}</td>
+        <td>${esc(r.villageName)}</td>
+        <td class="right ${cls}">${label}</td>
+      </tr>`
+    }).join('')
+    const { label: totLabel, direction: totDir } = formatBalance(grandTotal)
+    const totCls = totDir === 'owes' ? 'debit' : totDir === 'credit' ? 'credit' : 'muted'
+    const table = `<table>
+      <thead><tr>
+        <th>Farmer</th><th>Father Name</th><th>Village</th><th class="right">Outstanding Balance</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td colspan="3" class="right">Total Outstanding</td>
+        <td class="right ${totCls}">${totLabel}</td>
+      </tr></tfoot>
+    </table>`
+    printReport('Village Outstandings', `Period: ${dateRange || 'All dates'}`, table)
+  }
 
   const filters = (
     <>
@@ -62,7 +84,14 @@ export default function VillageOutstandingsPage() {
 
   return (
     <ReportShell title="Village Outstandings" filters={filters} onRun={run}
-      isLoading={isLoading} ran={true}>
+      isLoading={isLoading} ran={true}
+      actions={data.length > 0 ? (
+        <button onClick={handlePrint}
+          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+          ⬇ Download PDF
+        </button>
+      ) : undefined}
+    >
       {data.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">No data found.</p>
       ) : (
