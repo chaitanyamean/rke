@@ -369,7 +369,9 @@ public class ReportService {
                     i.name,
                     ic.id::text,
                     ic.name,
-                    SUM(ti.quantity)                         AS total_quantity,
+                    SUM(CASE WHEN t.transaction_type = 'return'
+                             THEN -ti.quantity
+                             ELSE  ti.quantity END)          AS total_quantity,
                     SUM(ti.amount)                           AS total_amount
                 FROM transaction_items ti
                 JOIN transactions t       ON  t.id        = ti.transaction_id
