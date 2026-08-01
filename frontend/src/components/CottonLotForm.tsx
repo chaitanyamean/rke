@@ -34,12 +34,13 @@ interface EntryRowProps {
   row: RowState
   villages: Village[]
   commonPrice: string
+  isDuplicate?: boolean
   onChange: (patch: Partial<RowState>) => void
   onRemove: () => void
   canRemove: boolean
 }
 
-function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }: EntryRowProps) {
+function EntryRow({ row, villages, commonPrice, isDuplicate = false, onChange, onRemove, canRemove }: EntryRowProps) {
   const { data: farmers = [], isLoading } = useFarmers({ villageId: row.villageId }, !!row.villageId)
 
   const qty = parseFloat(row.quantity)
@@ -66,7 +67,7 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
   }, [commonPrice])
 
   return (
-    <tr className="border-b border-slate-100 last:border-0">
+    <tr className={`border-b border-slate-100 last:border-0 ${isDuplicate ? 'bg-red-50 ring-1 ring-inset ring-red-300' : ''}`}>
       <td className="py-2 pr-2">
         <select
           value={row.villageId}
@@ -216,9 +217,19 @@ export default function CottonLotForm() {
     return r.villageId && r.farmerId && qty > 0 && price >= 0
   })
   const commonPriceValid = !isNaN(parseFloat(commonPrice)) && parseFloat(commonPrice) >= 0
-  const canReview = rowsValid && commonPriceValid && !!lotDate
+
+  const hasDuplicateFarmers = useMemo(() => {
+    const ids = rows.map((r) => r.farmerId).filter(Boolean)
+    return ids.length !== new Set(ids).size
+  }, [rows])
+
+  const canReview = rowsValid && commonPriceValid && !!lotDate && !hasDuplicateFarmers
 
   const handleReview = () => {
+    if (hasDuplicateFarmers) {
+      setError('Each farmer can only be added once. Remove duplicate farmer rows before continuing.')
+      return
+    }
     if (!canReview) return
     setError(null)
     setSaveDisabled(false)
@@ -475,16 +486,24 @@ export default function CottonLotForm() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <EntryRow
-                  key={row.key}
-                  row={row}
-                  villages={villages}
-                  commonPrice={commonPrice}
-                  onChange={(patch) => updateRow(row.key, patch)}
-                  onRemove={() => removeRow(row.key)}
-                  canRemove={rows.length > 0}                />
-              ))}
+              {rows.map((row) => {
+                const takenFarmerIds = new Set(
+                  rows.filter((r) => r.key !== row.key).map((r) => r.farmerId).filter(Boolean)
+                )
+                const isDuplicate = Boolean(row.farmerId && takenFarmerIds.has(row.farmerId))
+                return (
+                  <EntryRow
+                    key={row.key}
+                    row={row}
+                    villages={villages}
+                    commonPrice={commonPrice}
+                    isDuplicate={isDuplicate}
+                    onChange={(patch) => updateRow(row.key, patch)}
+                    onRemove={() => removeRow(row.key)}
+                    canRemove={rows.length > 0}
+                  />
+                )
+              })}
             </tbody>
           </table>
         </div>

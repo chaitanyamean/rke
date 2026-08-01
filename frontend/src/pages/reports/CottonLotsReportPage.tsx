@@ -60,7 +60,7 @@ export default function CottonLotsReportPage() {
         <th>Date</th><th>Serial</th><th>Vehicle Reg</th><th>Muta Hamali</th>
         <th class="right">Common Price (₹/kg)</th>
         <th>Village</th><th>Farmer</th>
-        <th class="right">Qty(kg)</th><th class="right">Price (₹)</th><th class="right">Amount (₹)</th>
+        <th class="right">Qty(kg)</th><th class="right">Price (₹/kg)</th><th class="right">Amount (₹)</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
@@ -129,7 +129,7 @@ export default function CottonLotsReportPage() {
           <table className="w-full min-w-[900px] text-sm border-collapse">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Serial', 'Vehicle Reg', 'Muta Hamali', 'Common Price (₹/kg)', 'Village', 'Farmer', 'Qty(kgs)', 'Price (₹)', 'Amount (₹)', ...(isAdmin ? [''] : [])].map((h, i) => (
+                {['Date', 'Serial', 'Vehicle Reg', 'Muta Hamali', 'Common Price (₹/kg)', 'Village', 'Farmer', 'Qty(kgs)', 'Price (₹/kg)', 'Amount (₹)', ...(isAdmin ? [''] : [])].map((h, i) => (
                   <th key={i} className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
