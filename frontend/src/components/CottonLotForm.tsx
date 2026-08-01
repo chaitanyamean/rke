@@ -302,7 +302,7 @@ export default function CottonLotForm() {
           <ReviewRow label="Vehicle Serial (auto)" value={serialPreview ?? '—'} />
           <ReviewRow label="Vehicle Reg Number" value={vehicleReg || '—'} />
           <ReviewRow label="Muta Hamali Name" value={mutaHamali || '—'} />
-          <ReviewRow label="Common Price (₹)" value={`₹${parseFloat(commonPrice).toFixed(2)}`} />
+          <ReviewRow label="Common Price (₹/kg)" value={`₹${parseFloat(commonPrice).toFixed(2)}`} />
           <ReviewRow label="Lot Date" value={lotDate} />
 
           <hr className="my-2 border-slate-100" />

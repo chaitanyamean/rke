@@ -58,9 +58,9 @@ export default function CottonLotsReportPage() {
     const table = `<table>
       <thead><tr>
         <th>Date</th><th>Serial</th><th>Vehicle Reg</th><th>Muta Hamali</th>
-        <th class="right">Common Price (₹)</th>
+        <th class="right">Common Price (₹/kg)</th>
         <th>Village</th><th>Farmer</th>
-        <th class="right">Qty</th><th class="right">Price (₹)</th><th class="right">Amount (₹)</th>
+        <th class="right">Qty(kg)</th><th class="right">Price (₹)</th><th class="right">Amount (₹)</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
