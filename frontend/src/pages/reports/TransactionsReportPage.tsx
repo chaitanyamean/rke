@@ -12,11 +12,13 @@ function editPathFor(transactionType: string, transactionId: string): string | n
     case 'cash_payment': return `/payments/payment/${transactionId}/edit`
     case 'cash_receipt': return `/payments/receipt/${transactionId}/edit`
     case 'return':       return `/returns/${transactionId}/edit`
+    case 'cotton_procurement': return null  // edit via cotton lot page — no direct entry edit
     default:             return null
   }
 }
 
 function fmtType(t: string) {
+  if (t === 'cotton_procurement') return 'Cotton Procurement'
   return t.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -83,7 +85,7 @@ export default function TransactionsReportPage() {
           ${isFirst ? `<td${spanAttr}>${esc(first.farmerName)}${first.fatherName ? `<br/><span style="color:#94a3b8;font-size:9px">${esc(first.fatherName)}</span>` : ''}</td>` : ''}
           ${isFirst ? `<td${spanAttr}><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>` : ''}
           <td>${esc(row.categoryName)}</td>
-          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}</span>`}</td>
+          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : first.transactionType === 'cotton_procurement' ? 'Cotton Procurement' : '—'}</span>`}</td>
           <td class="right">${fmtQty(row.quantity)}</td>
           <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
           ${isFirst ? `<td${spanAttr} class="right">${first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
@@ -203,7 +205,8 @@ export default function TransactionsReportPage() {
                         {row.itemName ?? (
                           <span className="italic text-slate-500">
                             {first.transactionType === 'cash_payment' ? 'Payment' :
-                             first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}
+                             first.transactionType === 'cash_receipt' ? 'Payment Received' :
+                             first.transactionType === 'cotton_procurement' ? 'Cotton Procurement' : '—'}
                           </span>
                         )}
                       </td>

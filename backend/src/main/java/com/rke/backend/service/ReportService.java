@@ -259,7 +259,16 @@ public class ReportService {
                 "    f.name,\n" +
                 "    f.father_name,\n" +
                 "    v.name AS village_name,\n" +
-                "    COALESCE(SUM(" + contributionCase + "), 0) AS outstanding_balance\n" +
+                "    COALESCE(SUM(" + contributionCase + "), 0)\n" +
+                "    + COALESCE((\n" +
+                "        SELECT SUM(cle.quantity * cle.price)\n" +
+                "        FROM cotton_lot_entries cle\n" +
+                "        JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "        WHERE cle.farmer_id = f.id\n" +
+                "          AND cle.tenant_id = :tenantId\n" +
+                (fromDate != null ? "          AND cl.lot_date >= :fromDate\n" : "") +
+                (toDate   != null ? "          AND cl.lot_date <= :toDate\n"   : "") +
+                "    ), 0) AS outstanding_balance\n" +
                 "FROM farmers f\n" +
                 "LEFT JOIN villages v ON v.id = f.village_id\n" +
                 "LEFT JOIN transactions t\n" +
@@ -340,7 +349,35 @@ public class ReportService {
         if (billNumber != null && !billNumber.isBlank())
                                 sql.append("  AND t.bill_number ILIKE :billNumber\n");
 
-        sql.append("ORDER BY t.transaction_date, t.created_at, t.id, ic.name NULLS LAST, i.name NULLS LAST");
+        // UNION cotton procurement entries
+        sql.append("\nUNION ALL\n\n");
+        sql.append(
+                "SELECT\n" +
+                "    cle.id::text,\n" +
+                "    cl.lot_date::text        AS transaction_date,\n" +
+                "    cl.vehicle_serial_number AS bill_number,\n" +
+                "    'cotton_procurement'     AS transaction_type,\n" +
+                "    f2.name                  AS farmer_name,\n" +
+                "    f2.father_name,\n" +
+                "    NULL                     AS category_name,\n" +
+                "    NULL                     AS item_name,\n" +
+                "    cle.quantity,\n" +
+                "    cle.price,\n" +
+                "    0                        AS debit_amount,\n" +
+                "    (cle.quantity * cle.price) AS credit_amount,\n" +
+                "    NULL                     AS remarks\n" +
+                "FROM cotton_lot_entries cle\n" +
+                "JOIN cotton_lots cl  ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "JOIN farmers f2      ON f2.id = cle.farmer_id AND f2.tenant_id = :tenantId\n" +
+                "WHERE cle.tenant_id = :tenantId\n");
+
+        if (fromDate != null)   sql.append("  AND cl.lot_date >= :fromDate\n");
+        if (toDate != null)     sql.append("  AND cl.lot_date <= :toDate\n");
+        if (farmerId != null)   sql.append("  AND cle.farmer_id = :farmerId\n");
+        if (billNumber != null && !billNumber.isBlank())
+                                sql.append("  AND cl.vehicle_serial_number ILIKE :billNumber\n");
+
+        sql.append("\nORDER BY 2, 3, 1 NULLS LAST, 7 NULLS LAST, 8 NULLS LAST");
 
         Query query = entityManager.createNativeQuery(sql.toString());
         query.setParameter("tenantId", tenantId);
