@@ -301,21 +301,20 @@ export default function ReturnForm() {
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-slate-500">Return qty:</span>
                       <input
-                        type="number"
-                        min="0.001"
-                        max={cap}
-                        step="any"
+                        type="text"
                         value={qtyStr}
                         onChange={(e) => handleQty(item.itemId, e.target.value)}
                         disabled={!checked || fullyReturned}
                         className={`w-20 rounded border px-2 py-1 text-sm disabled:bg-slate-50 ${
-                          qtyError ? 'border-red-400' : 'border-slate-300'
+                          (qtyError || (qtyStr && isNaN(parseFloat(qtyStr)))) ? 'border-red-400' : 'border-slate-300'
                         }`}
                       />
                     </div>
 
                     {fullyReturned ? (
                       <span className="text-xs text-slate-400">Fully returned</span>
+                    ) : qtyStr && isNaN(parseFloat(qtyStr)) ? (
+                      <span className="text-xs text-red-500">Enter a number</span>
                     ) : (
                       qtyError && <span className="text-xs text-red-500">1–{cap}</span>
                     )}

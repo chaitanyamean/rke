@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useVillages } from '../api/villages'
 import { useFarmers } from '../api/farmers'
 import { useSerialPreview, useCreateCottonLot } from '../api/cotton'
 import type { CottonLotEntryInput } from '../api/cotton'
-import type { Village } from '../types'
+import type { Farmer, Village } from '../types'
+import AddFarmerModal from './AddFarmerModal'
 
 type Phase = 'form' | 'review' | 'done'
 
@@ -168,10 +170,13 @@ export default function CottonLotForm() {
 
   // Entry rows
   const [rows, setRows] = useState<RowState[]>([])
+  const [showAddFarmer, setShowAddFarmer] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [saveDisabled, setSaveDisabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const queryClient = useQueryClient()
 
   const { data: serialPreview } = useSerialPreview()
   const { data: villages = [] } = useVillages()
@@ -263,6 +268,7 @@ export default function CottonLotForm() {
     setSavedSerial(null)
     setSavedId(null)
     setSaveDisabled(false)
+    setShowAddFarmer(false)
     setError(null)
   }
 
@@ -387,7 +393,7 @@ export default function CottonLotForm() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
-              Vehicle Registration Number
+              Vehicle Registration Number <span className="text-red-500">*</span>
             </span>
             <input
               type="text"
@@ -399,7 +405,7 @@ export default function CottonLotForm() {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Muta Hamali Name</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">Muta Hamali Name<span className="text-red-500">*</span></span>
             <input
               type="text"
               value={mutaHamali}
@@ -411,7 +417,7 @@ export default function CottonLotForm() {
 
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
-              Common Price (₹ / kgs)
+              Common Price (₹ / kgs) <span className="text-red-500">*</span>
             </span>
             <input
               type="text"
@@ -430,7 +436,7 @@ export default function CottonLotForm() {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Lot Date</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">Lot Date <span className="text-red-500">*</span></span>
             <input
               type="date"
               value={lotDate}
@@ -443,18 +449,27 @@ export default function CottonLotForm() {
 
       {/* Cotton Entries */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Cotton Entries
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Cotton Entries
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowAddFarmer(true)}
+            className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+          >
+            + New Farmer
+          </button>
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="pb-2 pr-2">Village</th>
-                <th className="pb-2 pr-2">Farmer</th>
-                <th className="pb-2 pr-2">Qty(Kgs)</th>
-                <th className="pb-2 pr-2">Price(₹ / kgs)</th>
+                <th className="pb-2 pr-2">Village <span className="text-red-500">*</span></th>
+                <th className="pb-2 pr-2">Farmer <span className="text-red-500">*</span></th>
+                <th className="pb-2 pr-2">Qty(Kgs) <span className="text-red-500">*</span></th>
+                <th className="pb-2 pr-2">Price(₹ / kgs) <span className="text-red-500">*</span></th>
                 <th className="pb-2 pr-2 text-right">Amount</th>
                 <th className="pb-2 w-8" />
               </tr>
@@ -508,6 +523,16 @@ export default function CottonLotForm() {
           END →
         </button>
       </div>
+
+      {showAddFarmer && (
+        <AddFarmerModal
+          onCreated={(_farmer: Farmer) => {
+            queryClient.invalidateQueries({ queryKey: ['farmers'] })
+            setShowAddFarmer(false)
+          }}
+          onClose={() => setShowAddFarmer(false)}
+        />
+      )}
     </div>
   )
 }

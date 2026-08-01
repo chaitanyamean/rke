@@ -524,13 +524,19 @@ function LineRow({ line, items, isDuplicate = false, onItemChange, onQtyChange, 
           Qty <span className="text-red-500">*</span>
         </span>
         <input
-          type="number"
-          min="0.001"
-          step="any"
+          type="text"
           value={line.quantity}
           onChange={(e) => onQtyChange(e.target.value)}
-          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+          placeholder="0"
+          className={`w-full rounded border px-2 py-1.5 text-sm ${
+            line.quantity && isNaN(parseFloat(line.quantity))
+              ? 'border-red-400'
+              : 'border-slate-300'
+          }`}
         />
+        {line.quantity && isNaN(parseFloat(line.quantity)) && (
+          <p className="mt-0.5 text-xs text-red-600">Enter a number</p>
+        )}
       </div>
 
       {/* <div className="w-24">
