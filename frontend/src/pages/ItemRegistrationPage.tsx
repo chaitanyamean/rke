@@ -69,13 +69,33 @@ export default function ItemRegistrationPage() {
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Credit Price <span className="text-red-500">*</span>
             </span>
-            <input type="number" min="0.01" step="0.01" value={creditPrice} onChange={(e) => setCreditPrice(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input
+              type="text"
+              value={creditPrice}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === '' || /^\d*\.?\d*$/.test(val)) setCreditPrice(val)
+              }}
+              className={`w-full rounded-md border px-3 py-2 ${
+                creditPrice && isNaN(parseFloat(creditPrice)) ? 'border-red-400' : 'border-slate-300'
+              }`}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Cash Price <span className="text-red-500">*</span>
             </span>
-            <input type="number" min="0.01" step="0.01" value={cashPrice} onChange={(e) => setCashPrice(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+            <input
+              type="text"
+              value={cashPrice}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === '' || /^\d*\.?\d*$/.test(val)) setCashPrice(val)
+              }}
+              className={`w-full rounded-md border px-3 py-2 ${
+                cashPrice && isNaN(parseFloat(cashPrice)) ? 'border-red-400' : 'border-slate-300'
+              }`}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">

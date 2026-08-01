@@ -147,7 +147,7 @@ export default function CottonLotEditPage() {
     return r.villageId && r.farmerId && qty > 0 && price >= 0
   })
   const commonPriceValid = !isNaN(parseFloat(commonPrice)) && parseFloat(commonPrice) >= 0
-  const canSave = rowsValid && commonPriceValid && !!lotDate && !update.isPending
+  const canSave = rowsValid && commonPriceValid && !!lotDate && lotDate <= today() && !update.isPending
 
   const handleSave = async () => {
     if (!canSave) return
@@ -225,7 +225,7 @@ export default function CottonLotEditPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Lot Date</span>
-            <input type="date" value={lotDate} onChange={(e) => setLotDate(e.target.value)}
+            <input type="date" value={lotDate} max={today()} onChange={(e) => setLotDate(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2" />
           </label>
         </div>

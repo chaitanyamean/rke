@@ -125,12 +125,18 @@ export default function ItemListPage() {
                       <td className="px-4 py-2 text-slate-600">
                         {editing ? (
                           <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
+                            type="text"
                             value={draft.creditPrice}
-                            onChange={(e) => setDraft((d) => ({ ...d, creditPrice: e.target.value }))}
-                            className="w-28 rounded-md border border-slate-300 px-2 py-1"
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === '' || /^\d*\.?\d*$/.test(val))
+                                setDraft((d) => ({ ...d, creditPrice: val }))
+                            }}
+                            className={`w-28 rounded-md border px-2 py-1 ${
+                              draft.creditPrice && isNaN(parseFloat(draft.creditPrice))
+                                ? 'border-red-400'
+                                : 'border-slate-300'
+                            }`}
                           />
                         ) : (
                           item.creditPrice.toFixed(2)
@@ -139,12 +145,18 @@ export default function ItemListPage() {
                       <td className="px-4 py-2 text-slate-600">
                         {editing ? (
                           <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
+                            type="text"
                             value={draft.cashPrice}
-                            onChange={(e) => setDraft((d) => ({ ...d, cashPrice: e.target.value }))}
-                            className="w-28 rounded-md border border-slate-300 px-2 py-1"
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === '' || /^\d*\.?\d*$/.test(val))
+                                setDraft((d) => ({ ...d, cashPrice: val }))
+                            }}
+                            className={`w-28 rounded-md border px-2 py-1 ${
+                              draft.cashPrice && isNaN(parseFloat(draft.cashPrice))
+                                ? 'border-red-400'
+                                : 'border-slate-300'
+                            }`}
                           />
                         ) : (
                           item.cashPrice.toFixed(2)
