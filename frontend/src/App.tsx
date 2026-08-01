@@ -21,6 +21,7 @@ import PaymentEditPage from './pages/PaymentEditPage'
 import ReturnPage from './pages/ReturnPage'
 import ReturnEditPage from './pages/ReturnEditPage'
 import CottonLotPage from './pages/CottonLotPage'
+import CottonLotEditPage from './pages/CottonLotEditPage'
 import TransactionsReportPage from './pages/reports/TransactionsReportPage'
 import ReportsLandingPage from './pages/reports/ReportsLandingPage'
 import FarmerLedgerPage from './pages/reports/FarmerLedgerPage'
@@ -28,6 +29,7 @@ import VillageOutstandingsPage from './pages/reports/VillageOutstandingsPage'
 import ItemSalesPage from './pages/reports/ItemSalesPage'
 import DateSalesPage from './pages/reports/DateSalesPage'
 import DatePaymentsPage from './pages/reports/DatePaymentsPage'
+import CottonLotsReportPage from './pages/reports/CottonLotsReportPage'
 
 export default function App() {
   return (
@@ -56,6 +58,7 @@ export default function App() {
           <Route path="/reports/date-sales" element={<DateSalesPage />} />
           <Route path="/reports/date-payments" element={<DatePaymentsPage />} />
           <Route path="/reports/transactions" element={<TransactionsReportPage />} />
+          <Route path="/reports/cotton-lots" element={<CottonLotsReportPage />} />
 
           {/* Admin-only */}
           <Route element={<AdminRoute />}>
@@ -71,6 +74,7 @@ export default function App() {
             <Route path="/payments/payment/:id/edit" element={<PaymentEditPage direction="payment" />} />
             <Route path="/payments/receipt/:id/edit" element={<PaymentEditPage direction="receipt" />} />
             <Route path="/returns/:id/edit" element={<ReturnEditPage />} />
+            <Route path="/cotton/:id/edit" element={<CottonLotEditPage />} />
           </Route>
 
           {/* Super admin only */}

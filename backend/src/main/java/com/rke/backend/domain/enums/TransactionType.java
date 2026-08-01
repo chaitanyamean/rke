@@ -9,5 +9,6 @@ public enum TransactionType {
     CREDIT_SALE,
     CASH_PAYMENT,
     CASH_RECEIPT,
-    RETURN
+    RETURN,
+    COTTON_PROCUREMENT
 }

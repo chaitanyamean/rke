@@ -5,7 +5,7 @@ import { useSerialPreview, useCreateCottonLot } from '../api/cotton'
 import type { CottonLotEntryInput } from '../api/cotton'
 import type { Village } from '../types'
 
-type Phase = 'form' | 'done'
+type Phase = 'form' | 'review' | 'done'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -16,15 +16,16 @@ function today(): string {
 interface RowState {
   key: string
   villageId: string
+  villageName: string
   farmerId: string
+  farmerName: string
   quantity: string
   price: string
 }
 
 function makeRow(commonPrice: string): RowState {
-  return { key: crypto.randomUUID(), villageId: '', farmerId: '', quantity: '', price: commonPrice }
+  return { key: crypto.randomUUID(), villageId: '', villageName: '', farmerId: '', farmerName: '', quantity: '', price: commonPrice }
 }
-
 // ─── Entry row sub-component ────────────────────────────────────────────────
 
 interface EntryRowProps {
@@ -44,7 +45,14 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
   const amount = !isNaN(qty) && !isNaN(price) ? qty * price : null
 
   const handleVillage = (villageId: string) => {
-    onChange({ villageId, farmerId: '' })
+    const villageName = villages.find(v => v.id === villageId)?.name ?? ''
+    onChange({ villageId, villageName, farmerId: '', farmerName: '' })
+  }
+
+  const handleFarmer = (farmerId: string) => {
+    const farmer = farmers.find(f => f.id === farmerId)
+    const farmerName = farmer ? `${farmer.name}${farmer.fatherName ? ` (${farmer.fatherName})` : ''}` : ''
+    onChange({ farmerId, farmerName })
   }
 
   // Sync price to new commonPrice only while price field is still at default.
@@ -65,9 +73,7 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
         >
           <option value="">Village…</option>
           {villages.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-            </option>
+            <option key={v.id} value={v.id}>{v.name}</option>
           ))}
         </select>
       </td>
@@ -75,7 +81,7 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
       <td className="py-2 pr-2">
         <select
           value={row.farmerId}
-          onChange={(e) => onChange({ farmerId: e.target.value })}
+          onChange={(e) => handleFarmer(e.target.value)}
           disabled={!row.villageId || isLoading}
           className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
         >
@@ -90,25 +96,29 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
 
       <td className="py-2 pr-2 w-28">
         <input
-          type="number"
-          min="0.001"
-          step="any"
+          type="text"
           value={row.quantity}
           onChange={(e) => onChange({ quantity: e.target.value })}
           placeholder="Qty"
-          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className={`w-full rounded border px-2 py-1.5 text-sm ${
+            row.quantity && isNaN(parseFloat(row.quantity))
+              ? 'border-red-400'
+              : 'border-slate-300'
+          }`}
         />
       </td>
 
       <td className="py-2 pr-2 w-28">
         <input
-          type="number"
-          min="0"
-          step="any"
+          type="text"
           value={row.price}
           onChange={(e) => onChange({ price: e.target.value })}
           placeholder="Price"
-          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className={`w-full rounded border px-2 py-1.5 text-sm ${
+            row.price && isNaN(parseFloat(row.price))
+              ? 'border-red-400'
+              : 'border-slate-300'
+          }`}
         />
       </td>
 
@@ -132,6 +142,17 @@ function EntryRow({ row, villages, commonPrice, onChange, onRemove, canRemove }:
   )
 }
 
+// ─── Review row ───────────────────────────────────────────────────────────────
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-2">
+      <span className="w-48 shrink-0 text-slate-500">{label}</span>
+      <span className="font-medium text-slate-800">{value}</span>
+    </div>
+  )
+}
+
 // ─── Main form ───────────────────────────────────────────────────────────────
 
 export default function CottonLotForm() {
@@ -146,9 +167,10 @@ export default function CottonLotForm() {
   const [lotDate, setLotDate] = useState(today)
 
   // Entry rows
-  const [rows, setRows] = useState<RowState[]>([makeRow('')])
+  const [rows, setRows] = useState<RowState[]>([])
 
   const [saving, setSaving] = useState(false)
+  const [saveDisabled, setSaveDisabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { data: serialPreview } = useSerialPreview()
@@ -189,10 +211,18 @@ export default function CottonLotForm() {
     return r.villageId && r.farmerId && qty > 0 && price >= 0
   })
   const commonPriceValid = !isNaN(parseFloat(commonPrice)) && parseFloat(commonPrice) >= 0
-  const canSave = rowsValid && commonPriceValid && !!lotDate && !saving
+  const canReview = rowsValid && commonPriceValid && !!lotDate
+
+  const handleReview = () => {
+    if (!canReview) return
+    setError(null)
+    setSaveDisabled(false)
+    setPhase('review')
+  }
 
   const handleSave = async () => {
-    if (!canSave) return
+    if (!canReview) return
+    setSaveDisabled(true)
     setSaving(true)
     setError(null)
     try {
@@ -217,6 +247,7 @@ export default function CottonLotForm() {
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         'Save failed. Please try again.'
       setError(msg)
+      setSaveDisabled(false)
     } finally {
       setSaving(false)
     }
@@ -228,9 +259,10 @@ export default function CottonLotForm() {
     setMutaHamali('')
     setCommonPrice('')
     setLotDate(today())
-    setRows([makeRow('')])
+    setRows([])
     setSavedSerial(null)
     setSavedId(null)
+    setSaveDisabled(false)
     setError(null)
   }
 
@@ -250,6 +282,84 @@ export default function CottonLotForm() {
         >
           OK — New Entry
         </button>
+      </div>
+    )
+  }
+
+  // ── Review ────────────────────────────────────────────────────────────────
+  if (phase === 'review') {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <h1 className="text-2xl font-bold text-slate-800">Cotton Lot — Review</h1>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3 text-sm">
+          <ReviewRow label="Vehicle Serial (auto)" value={serialPreview ?? '—'} />
+          <ReviewRow label="Vehicle Reg Number" value={vehicleReg || '—'} />
+          <ReviewRow label="Muta Hamali Name" value={mutaHamali || '—'} />
+          <ReviewRow label="Common Price (₹)" value={`₹${parseFloat(commonPrice).toFixed(2)}`} />
+          <ReviewRow label="Lot Date" value={lotDate} />
+
+          <hr className="my-2 border-slate-100" />
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="pb-1 font-medium">Village</th>
+                <th className="pb-1 font-medium">Farmer</th>
+                <th className="pb-1 font-medium text-right">Qty(Kgs)</th>
+                <th className="pb-1 font-medium text-right">Price (₹ / kgs)</th>
+                <th className="pb-1 font-medium text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const qty = parseFloat(r.quantity)
+                const price = parseFloat(r.price)
+                const amount = qty * price
+                return (
+                  <tr key={r.key} className="border-t border-slate-100">
+                    <td className="py-1">{r.villageName}</td>
+                    <td className="py-1">{r.farmerName}</td>
+                    <td className="py-1 text-right">{qty.toFixed(3)}</td>
+                    <td className="py-1 text-right">₹{price.toFixed(2)}</td>
+                    <td className="py-1 text-right">₹{amount.toFixed(2)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-300 font-bold">
+                <td colSpan={2} className="pt-2 text-right text-slate-700">Total</td>
+                <td className="pt-2 text-right">{totalQty.toFixed(3)}</td>
+                <td />
+                <td className="pt-2 text-right">₹{totalAmount.toFixed(2)}</td>
+              </tr>
+              {/* <tr>
+                <td colSpan={5} className="pt-3 text-xs text-red-600 italic">
+                  * Amount = (Quantity in Kgs × Price per kgs) / 100
+                </td>
+              </tr> */}
+            </tfoot>
+          </table>
+        </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setPhase('form')}
+            className="rounded-md border border-slate-300 px-5 py-2 text-slate-700 hover:bg-slate-50"
+          >
+            ← Back
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saveDisabled}
+            className="rounded-md bg-brand px-6 py-2 font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Lot'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -301,17 +411,22 @@ export default function CottonLotForm() {
 
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
-              Common Price (₹ / quintal)
+              Common Price (₹ / kgs)
             </span>
             <input
-              type="number"
-              min="0"
-              step="any"
+              type="text"
               value={commonPrice}
               onChange={(e) => setCommonPrice(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className={`w-full rounded-md border px-3 py-2 ${
+                commonPrice && isNaN(parseFloat(commonPrice))
+                  ? 'border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400'
+                  : 'border-slate-300'
+              }`}
             />
+            {commonPrice && isNaN(parseFloat(commonPrice)) && (
+              <p className="mt-1 text-xs text-red-600">Please enter a valid number</p>
+            )}
           </label>
 
           <label className="block">
@@ -338,8 +453,8 @@ export default function CottonLotForm() {
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="pb-2 pr-2">Village</th>
                 <th className="pb-2 pr-2">Farmer</th>
-                <th className="pb-2 pr-2">Quantity</th>
-                <th className="pb-2 pr-2">Price (₹)</th>
+                <th className="pb-2 pr-2">Qty(Kgs)</th>
+                <th className="pb-2 pr-2">Price(₹ / kgs)</th>
                 <th className="pb-2 pr-2 text-right">Amount</th>
                 <th className="pb-2 w-8" />
               </tr>
@@ -353,8 +468,7 @@ export default function CottonLotForm() {
                   commonPrice={commonPrice}
                   onChange={(patch) => updateRow(row.key, patch)}
                   onRemove={() => removeRow(row.key)}
-                  canRemove={rows.length > 1}
-                />
+                  canRemove={rows.length > 0}                />
               ))}
             </tbody>
           </table>
@@ -378,17 +492,20 @@ export default function CottonLotForm() {
             <span className="font-semibold text-slate-800">₹{totalAmount.toFixed(2)}</span>
           </span>
         </div>
+        {/* <p className="mt-2 text-xs text-red-600 italic">
+          * Amount = (Quantity in Kgs × Price per kgs) / 100
+        </p> */}
       </section>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex justify-end">
         <button
-          onClick={handleSave}
-          disabled={!canSave}
+          onClick={handleReview}
+          disabled={!canReview}
           className="rounded-md bg-brand px-8 py-2.5 font-semibold text-white hover:opacity-90 disabled:opacity-40"
         >
-          {saving ? 'Saving…' : 'Save Lot'}
+          END →
         </button>
       </div>
     </div>

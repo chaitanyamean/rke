@@ -44,6 +44,7 @@ public final class TransactionClassifier {
 
             case CASH_RECEIPT -> LedgerDirection.CREDIT;
             case RETURN       -> LedgerDirection.CREDIT;
+            case COTTON_PROCUREMENT -> LedgerDirection.CREDIT;
         };
     }
 

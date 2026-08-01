@@ -1,9 +1,12 @@
 package com.rke.backend.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.rke.backend.domain.CottonLot;
 import com.rke.backend.domain.CottonLotEntry;
+import com.rke.backend.domain.Farmer;
+import com.rke.backend.domain.Village;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.dto.CottonLotEntryRequest;
 import com.rke.backend.dto.CottonLotEntryResponse;
@@ -147,12 +152,136 @@ public class CottonService {
     }
 
     @Transactional(readOnly = true)
-    public List<CottonLotResponse> listLots() {
-        return cottonLotRepository.findAllByOrderByLotDateDesc().stream()
+    public CottonLotResponse getLot(UUID id) {
+        UUID tenantId = currentUserService.getTenantId();
+        CottonLot lot = cottonLotRepository.findById(id)
+                .filter(l -> l.getTenantId().equals(tenantId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Cotton lot not found: " + id));
+
+        List<CottonLotEntry> entries = cottonLotEntryRepository.findByCottonLotId(lot.getId());
+
+        Map<UUID, Farmer> farmerMap = entries.stream()
+                .map(CottonLotEntry::getFarmerId).distinct()
+                .collect(Collectors.toMap(fid -> fid,
+                        fid -> farmerRepository.findById(fid).orElse(null), (a, b) -> a));
+        Map<UUID, Village> villageMap = entries.stream()
+                .map(CottonLotEntry::getVillageId).distinct()
+                .collect(Collectors.toMap(vid -> vid,
+                        vid -> villageRepository.findById(vid).orElse(null), (a, b) -> a));
+
+        List<CottonLotEntryResponse> entryResponses = entries.stream()
+                .map(e -> CottonLotEntryResponse.from(e,
+                        farmerMap.get(e.getFarmerId()), villageMap.get(e.getVillageId())))
+                .toList();
+        return CottonLotResponse.from(lot, entryResponses);
+    }
+
+    @Transactional
+    public CottonLotResponse updateCottonLot(UUID id, CottonLotRequest request) {
+        UUID tenantId = currentUserService.getTenantId();
+        CottonLot lot = cottonLotRepository.findById(id)
+                .filter(l -> l.getTenantId().equals(tenantId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Cotton lot not found: " + id));
+
+        List<ValidatedEntry> validatedEntries = validateEntries(request.entries());
+        BigDecimal totalQuantity = validatedEntries.stream()
+                .map(ValidatedEntry::quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalAmount = validatedEntries.stream()
+                .map(ValidatedEntry::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Snapshot before
+        Map<String, Object> before = auditService.snapshot(lot);
+
+        lot.setVehicleRegistrationNumber(trimToNull(request.vehicleRegistrationNumber()));
+        lot.setMutaHamaliName(trimToNull(request.mutaHamaliName()));
+        lot.setCommonPrice(request.commonPrice());
+        lot.setLotDate(request.lotDate());
+        lot.setTotalQuantity(totalQuantity);
+        lot.setTotalAmount(totalAmount);
+        cottonLotRepository.save(lot);
+
+        // Replace all entries
+        cottonLotEntryRepository.deleteByCottonLotId(lot.getId());
+        List<CottonLotEntry> savedEntries = new ArrayList<>(validatedEntries.size());
+        for (ValidatedEntry ve : validatedEntries) {
+            CottonLotEntry entry = CottonLotEntry.builder()
+                    .tenantId(tenantId)
+                    .cottonLotId(lot.getId())
+                    .farmerId(ve.farmerId())
+                    .villageId(ve.villageId())
+                    .quantity(ve.quantity())
+                    .price(ve.price())
+                    .amount(ve.amount())
+                    .build();
+            savedEntries.add(cottonLotEntryRepository.save(entry));
+        }
+
+        Map<String, Object> after = auditService.snapshot(lot);
+        auditService.record("cotton_lots", lot.getId(), AuditAction.UPDATE, before, after);
+
+        Map<UUID, Farmer> farmerMap = savedEntries.stream()
+                .map(CottonLotEntry::getFarmerId).distinct()
+                .collect(Collectors.toMap(fid -> fid,
+                        fid -> farmerRepository.findById(fid).orElse(null), (a, b) -> a));
+        Map<UUID, Village> villageMap = savedEntries.stream()
+                .map(CottonLotEntry::getVillageId).distinct()
+                .collect(Collectors.toMap(vid -> vid,
+                        vid -> villageRepository.findById(vid).orElse(null), (a, b) -> a));
+
+        List<CottonLotEntryResponse> entryResponses = savedEntries.stream()
+                .map(e -> CottonLotEntryResponse.from(e,
+                        farmerMap.get(e.getFarmerId()), villageMap.get(e.getVillageId())))
+                .toList();
+        return CottonLotResponse.from(lot, entryResponses);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CottonLotResponse> listLots(LocalDate fromDate, LocalDate toDate) {
+        List<CottonLot> lots;
+        if (fromDate != null && toDate != null) {
+            lots = cottonLotRepository.findByLotDateBetweenOrderByLotDateDesc(fromDate, toDate);
+        } else if (fromDate != null) {
+            lots = cottonLotRepository.findByLotDateGreaterThanEqualOrderByLotDateDesc(fromDate);
+        } else if (toDate != null) {
+            lots = cottonLotRepository.findByLotDateLessThanEqualOrderByLotDateDesc(toDate);
+        } else {
+            lots = cottonLotRepository.findAllByOrderByLotDateDesc();
+        }
+
+        // Collect all farmerIds and villageIds across all entries for batch lookup.
+        List<CottonLotEntry> allEntries = lots.stream()
+                .flatMap(lot -> cottonLotEntryRepository.findByCottonLotId(lot.getId()).stream())
+                .collect(Collectors.toList());
+
+        Map<UUID, Farmer> farmerMap = allEntries.stream()
+                .map(CottonLotEntry::getFarmerId)
+                .distinct()
+                .collect(Collectors.toMap(
+                        id -> id,
+                        id -> farmerRepository.findById(id).orElse(null),
+                        (a, b) -> a));
+
+        Map<UUID, Village> villageMap = allEntries.stream()
+                .map(CottonLotEntry::getVillageId)
+                .distinct()
+                .collect(Collectors.toMap(
+                        id -> id,
+                        id -> villageRepository.findById(id).orElse(null),
+                        (a, b) -> a));
+
+        Map<UUID, List<CottonLotEntry>> entriesByLot = allEntries.stream()
+                .collect(Collectors.groupingBy(CottonLotEntry::getCottonLotId));
+
+        return lots.stream()
                 .map(lot -> {
-                    List<CottonLotEntryResponse> entries = cottonLotEntryRepository
-                            .findByCottonLotId(lot.getId()).stream()
-                            .map(CottonLotEntryResponse::from)
+                    List<CottonLotEntryResponse> entries = entriesByLot
+                            .getOrDefault(lot.getId(), List.of()).stream()
+                            .map(e -> CottonLotEntryResponse.from(
+                                    e,
+                                    farmerMap.get(e.getFarmerId()),
+                                    villageMap.get(e.getVillageId())))
                             .toList();
                     return CottonLotResponse.from(lot, entries);
                 })

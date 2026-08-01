@@ -1,20 +1,30 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 
 const REPORTS = [
-  { to: '/reports/ledger',              label: 'Farmer Ledger',         desc: 'Chronological transaction history with running balance for a specific farmer.' },
-  { to: '/reports/village-outstandings', label: 'Village Outstandings', desc: 'Outstanding credit balance aggregated by village.' },
-  { to: '/reports/item-sales',           label: 'Item Sales',           desc: 'Net quantity and amount sold per item, filterable by category and date.' },
-  { to: '/reports/date-sales',           label: 'Sales Summary',        desc: 'Day-by-day sales totals with cash vs credit breakdown and returns.' },
-  { to: '/reports/transactions',         label: 'Transactions',         desc: 'Search and filter all transactions across farmers by date, farmer, and bill number.' },
-  { to: '/reports/date-payments',        label: 'Payments and Receipts',       desc: 'Payments and receipts totals.' },
+  { to: '/reports/ledger',               label: 'Farmer Ledger',          desc: 'Chronological transaction history with running balance for a specific farmer.' },
+  { to: '/reports/village-outstandings', label: 'Village Outstandings',   desc: 'Outstanding credit balance aggregated by village.' },
+  { to: '/reports/item-sales',           label: 'Item Sales',             desc: 'Net quantity and amount sold per item, filterable by category and date.' },
+  { to: '/reports/date-sales',           label: 'Sales Summary',          desc: 'Day-by-day sales totals with cash vs credit breakdown and returns.' },
+  { to: '/reports/transactions',         label: 'Transactions',           desc: 'Search and filter all transactions across farmers by date, farmer, and bill number.' },
+  { to: '/reports/date-payments',        label: 'Payments and Receipts',  desc: 'Payments and receipts totals.' },
 ]
 
+const COTTON_REPORT = {
+  to: '/reports/cotton-lots',
+  label: 'Cotton Lots',
+  desc: 'List of all cotton procurement lots with quantities, amounts, and farmer entries.',
+}
+
 export default function ReportsLandingPage() {
+  const { hasFeature } = useAuth()
+  const reports = hasFeature('cotton_procurement') ? [...REPORTS, COTTON_REPORT] : REPORTS
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-slate-800">Reports</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {REPORTS.map((r) => (
+        {reports.map((r) => (
           <Link
             key={r.to}
             to={r.to}

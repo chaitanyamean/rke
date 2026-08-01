@@ -1,12 +1,19 @@
 package com.rke.backend.controller;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -43,7 +50,23 @@ public class CottonController {
 
     @GetMapping
     @RequiresFeature("cotton_procurement")
-    public List<CottonLotResponse> list() {
-        return cottonService.listLots();
+    public List<CottonLotResponse> list(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return cottonService.listLots(fromDate, toDate);
+    }
+
+    @GetMapping("/{id}")
+    @RequiresFeature("cotton_procurement")
+    public CottonLotResponse get(@PathVariable UUID id) {
+        return cottonService.getLot(id);
+    }
+
+    @PutMapping("/{id}")
+    @RequiresFeature("cotton_procurement")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public CottonLotResponse update(@PathVariable UUID id,
+                                    @Valid @RequestBody CottonLotRequest request) {
+        return cottonService.updateCottonLot(id, request);
     }
 }

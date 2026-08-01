@@ -83,7 +83,10 @@ export interface Item {
 export interface CottonLotEntry {
   id: string
   farmerId: string
+  farmerName: string | null
+  fatherName: string | null
   villageId: string
+  villageName: string | null
   quantity: number
   price: number
   amount: number

@@ -10,4 +10,6 @@ import com.rke.backend.domain.CottonLotEntry;
 public interface CottonLotEntryRepository extends JpaRepository<CottonLotEntry, UUID> {
 
     List<CottonLotEntry> findByCottonLotId(UUID cottonLotId);
+
+    void deleteByCottonLotId(UUID cottonLotId);
 }

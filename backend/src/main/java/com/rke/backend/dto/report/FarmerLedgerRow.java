@@ -29,5 +29,8 @@ public record FarmerLedgerRow(
         BigDecimal runningBalance,
         // TODO: interest formula not confirmed by client — always 0 for now.
         BigDecimal interestAmount,
-        String remarks) {
+        String remarks,
+        // For cotton_procurement rows: the cotton_lots.id (used for edit link).
+        // Null for all other transaction types.
+        String cottonLotId) {
 }

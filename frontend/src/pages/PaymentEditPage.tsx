@@ -123,13 +123,18 @@ export default function PaymentEditPage({ direction }: Props) {
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Amount (₹)</span>
             <input
-              type="number"
-              min="0.01"
-              step="0.01"
+              type="text"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className={`w-full rounded-md border px-3 py-2 ${
+                amount && isNaN(parseFloat(amount))
+                  ? 'border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400'
+                  : 'border-slate-300'
+              }`}
             />
+            {amount && isNaN(parseFloat(amount)) && (
+              <p className="mt-1 text-xs text-red-600">Please enter a valid number</p>
+            )}
           </label>
         </div>
         <label className="block">

@@ -9,18 +9,20 @@ import ReportShell from '../../components/ReportShell'
 import { formatBalance } from '../../lib/balance'
 import { printReport, esc } from '../../lib/printReport'
 
-function editPathFor(transactionType: string, transactionId: string): string | null {
+function editPathFor(transactionType: string, transactionId: string, cottonLotId?: string | null): string | null {
   switch (transactionType) {
     case 'cash_sale':    return `/sales/cash/${transactionId}/edit`
     case 'credit_sale':  return `/sales/credit/${transactionId}/edit`
     case 'cash_payment': return `/payments/payment/${transactionId}/edit`
     case 'cash_receipt': return `/payments/receipt/${transactionId}/edit`
     case 'return':       return `/returns/${transactionId}/edit`
+    case 'cotton_procurement': return cottonLotId ? `/cotton/${cottonLotId}/edit` : null
     default:             return null
   }
 }
 
 function fmtType(t: string) {
+  if (t === 'cotton_procurement') return 'Cotton Procurement'
   return t.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -101,7 +103,7 @@ export default function FarmerLedgerPage() {
           ${isFirst ? `<td${spanAttr} style="font-family:monospace;font-size:9px">${esc(first.billNumber)}</td>` : ''}
           ${isFirst ? `<td${spanAttr}><span class="badge ${isDebit ? 'badge-d' : 'badge-c'}">${esc(fmtType(first.transactionType))}</span></td>` : ''}
           <td>${esc(row.categoryName)}</td>
-          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}</span>`}</td>
+          <td>${esc(row.itemName) || `<span class="muted">${first.transactionType === 'cash_payment' ? 'Payment' : first.transactionType === 'cash_receipt' ? 'Payment Received' : first.transactionType === 'cotton_procurement' ? 'Cotton Procurement' : '—'}</span>`}</td>
           <td class="right">${fmtQty(row.quantity)}</td>
           <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
           ${isFirst ? `<td${spanAttr} class="right">${first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
@@ -197,7 +199,7 @@ export default function FarmerLedgerPage() {
                 const first = group[0]
                 const rowspan = group.length
                 const isDebit  = first.direction === 'DEBIT'
-                const editPath = isAdmin ? editPathFor(first.transactionType, first.transactionId) : null
+                const editPath = isAdmin ? editPathFor(first.transactionType, first.transactionId, first.cottonLotId) : null
 
                 return group.map((row, itemIdx) => {
                   const isFirstRow = itemIdx === 0
@@ -228,7 +230,8 @@ export default function FarmerLedgerPage() {
                         {row.itemName ?? (
                           <span className="italic text-slate-500">
                             {first.transactionType === 'cash_payment' ? 'Payment' :
-                             first.transactionType === 'cash_receipt' ? 'Payment Received' : '—'}
+                             first.transactionType === 'cash_receipt' ? 'Payment Received' :
+                             first.transactionType === 'cotton_procurement' ? 'Cotton Procurement' : '—'}
                           </span>
                         )}
                       </td>

@@ -92,13 +92,39 @@ public class ReportService {
                 "        t.created_at,\n" +
                 "        " + contributionCase + " AS signed_amount,\n" +
                 "        CASE WHEN (" + contributionCase + ") < 0 THEN ABS(t.grand_total) ELSE 0 END AS debit_amount,\n" +
-                "        CASE WHEN (" + contributionCase + ") > 0 THEN ABS(t.grand_total) ELSE 0 END AS credit_amount\n" +
+                "        CASE WHEN (" + contributionCase + ") > 0 THEN ABS(t.grand_total) ELSE 0 END AS credit_amount,\n" +
+                "        NULL::numeric AS cotton_qty,\n" +
+                "        NULL::numeric AS cotton_price_per_kg,\n" +
+                "        NULL::uuid    AS cotton_lot_id\n" +
                 "    FROM transactions t\n" +
                 "    WHERE t.tenant_id = :tenantId\n" +
                 "      AND t.farmer_id = :farmerId\n" +
                 (includeVoided ? "" : "      AND t.status = 'active'\n") +
                 (fromDate != null ? "      AND t.transaction_date >= :fromDate\n" : "") +
                 (toDate   != null ? "      AND t.transaction_date <= :toDate\n"   : "") +
+                "\n" +
+                "    UNION ALL\n" +
+                "\n" +
+                "    SELECT\n" +
+                "        cle.id,\n" +
+                "        cl.lot_date              AS transaction_date,\n" +
+                "        cl.vehicle_serial_number AS bill_number,\n" +
+                "        'cotton_procurement'     AS transaction_type,\n" +
+                "        (cle.quantity * cle.price) AS grand_total,\n" +
+                "        NULL                     AS remarks,\n" +
+                "        cl.created_at,\n" +
+                "        (cle.quantity * cle.price) AS signed_amount,\n" +
+                "        0                        AS debit_amount,\n" +
+                "        (cle.quantity * cle.price) AS credit_amount,\n" +
+                "        cle.quantity             AS cotton_qty,\n" +
+                "        cle.price               AS cotton_price_per_kg,\n" +
+                "        cl.id                   AS cotton_lot_id\n" +
+                "    FROM cotton_lot_entries cle\n" +
+                "    JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "    WHERE cle.tenant_id = :tenantId\n" +
+                "      AND cle.farmer_id = :farmerId\n" +
+                (fromDate != null ? "      AND cl.lot_date >= :fromDate\n" : "") +
+                (toDate   != null ? "      AND cl.lot_date <= :toDate\n"   : "") +
                 "),\n" +
                 "tx_balance AS (\n" +
                 "    SELECT *,\n" +
@@ -115,14 +141,16 @@ public class ReportService {
                 "    tb.transaction_type,\n" +
                 "    ic.name   AS category_name,\n" +
                 "    i.name    AS item_name,\n" +
-                "    ti.quantity,\n" +
-                "    ti.price,\n" +
+                "    COALESCE(ti.quantity, tb.cotton_qty) AS quantity,\n" +
+                "    COALESCE(ti.price, tb.cotton_price_per_kg) AS price,\n" +
                 "    tb.debit_amount,\n" +
                 "    tb.credit_amount,\n" +
                 "    tb.running_balance,\n" +
-                "    tb.remarks\n" +
+                "    tb.remarks,\n" +
+                "    tb.cotton_lot_id::text\n" +
                 "FROM tx_balance tb\n" +
                 "LEFT JOIN transaction_items ti ON ti.transaction_id = tb.id AND ti.tenant_id = :tenantId\n" +
+                "                               AND tb.transaction_type != 'cotton_procurement'\n" +
                 "LEFT JOIN items i              ON i.id = ti.item_id\n" +
                 "LEFT JOIN item_categories ic   ON ic.id = i.item_category_id\n" +
                 "ORDER BY tb.transaction_date, tb.created_at, tb.id, ic.name NULLS LAST, i.name NULLS LAST";
@@ -154,10 +182,10 @@ public class ReportService {
                     decimal(r[9]),   // creditAmount
                     decimal(r[10]),  // runningBalance
                     BigDecimal.ZERO, // interestAmount — formula not confirmed by client (TODO)
-                    str(r[11])       // remarks
+                    str(r[11]),      // remarks
+                    str(r[12])       // cottonLotId (null for non-cotton rows)
             );
-        }).toList();
-    }
+        }).toList();    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // 2. Village outstandings — aggregate credit balance per village

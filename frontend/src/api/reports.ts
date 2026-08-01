@@ -18,6 +18,8 @@ export interface FarmerLedgerRow {
   runningBalance: number
   interestAmount: number
   remarks: string | null
+  // non-null only for cotton_procurement rows — the cotton_lots.id
+  cottonLotId: string | null
 }
 
 export interface TransactionReportRow {
