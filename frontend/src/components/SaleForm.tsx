@@ -526,9 +526,14 @@ function LineRow({ line, items, isDuplicate = false, onItemChange, onQtyChange, 
         <input
           type="text"
           value={line.quantity}
-          onChange={(e) => onQtyChange(e.target.value)}
+          onChange={(e) => {
+            // Only allow digits and a single decimal point
+            const val = e.target.value
+            if (val === '' || /^\d*\.?\d*$/.test(val)) onQtyChange(val)
+          }}
           placeholder="0"
-          className={`w-full rounded border px-2 py-1.5 text-sm ${
+          disabled={!line.itemId}
+          className={`w-full rounded border px-2 py-1.5 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed ${
             line.quantity && isNaN(parseFloat(line.quantity))
               ? 'border-red-400'
               : 'border-slate-300'
