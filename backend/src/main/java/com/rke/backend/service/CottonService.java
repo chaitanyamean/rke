@@ -241,13 +241,13 @@ public class CottonService {
     public List<CottonLotResponse> listLots(LocalDate fromDate, LocalDate toDate) {
         List<CottonLot> lots;
         if (fromDate != null && toDate != null) {
-            lots = cottonLotRepository.findByLotDateBetweenOrderByLotDateDesc(fromDate, toDate);
+            lots = cottonLotRepository.findByLotDateBetweenOrderByLotDateAsc(fromDate, toDate);
         } else if (fromDate != null) {
-            lots = cottonLotRepository.findByLotDateGreaterThanEqualOrderByLotDateDesc(fromDate);
+            lots = cottonLotRepository.findByLotDateGreaterThanEqualOrderByLotDateAsc(fromDate);
         } else if (toDate != null) {
-            lots = cottonLotRepository.findByLotDateLessThanEqualOrderByLotDateDesc(toDate);
+            lots = cottonLotRepository.findByLotDateLessThanEqualOrderByLotDateAsc(toDate);
         } else {
-            lots = cottonLotRepository.findAllByOrderByLotDateDesc();
+            lots = cottonLotRepository.findAllByOrderByLotDateAsc();
         }
 
         // Collect all farmerIds and villageIds across all entries for batch lookup.

@@ -10,11 +10,11 @@ import com.rke.backend.domain.CottonLot;
 
 public interface CottonLotRepository extends JpaRepository<CottonLot, UUID> {
 
-    List<CottonLot> findAllByOrderByLotDateDesc();
+    List<CottonLot> findAllByOrderByLotDateAsc();
 
-    List<CottonLot> findByLotDateBetweenOrderByLotDateDesc(LocalDate from, LocalDate to);
+    List<CottonLot> findByLotDateBetweenOrderByLotDateAsc(LocalDate from, LocalDate to);
 
-    List<CottonLot> findByLotDateGreaterThanEqualOrderByLotDateDesc(LocalDate from);
+    List<CottonLot> findByLotDateGreaterThanEqualOrderByLotDateAsc(LocalDate from);
 
-    List<CottonLot> findByLotDateLessThanEqualOrderByLotDateDesc(LocalDate to);
+    List<CottonLot> findByLotDateLessThanEqualOrderByLotDateAsc(LocalDate to);
 }

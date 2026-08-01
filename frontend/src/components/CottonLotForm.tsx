@@ -223,9 +223,13 @@ export default function CottonLotForm() {
     return ids.length !== new Set(ids).size
   }, [rows])
 
-  const canReview = rowsValid && commonPriceValid && !!lotDate && !hasDuplicateFarmers
+  const canReview = rowsValid && commonPriceValid && !!lotDate && lotDate <= today() && !hasDuplicateFarmers
 
   const handleReview = () => {
+    if (lotDate > today()) {
+      setError('Lot date cannot be in the future.')
+      return
+    }
     if (hasDuplicateFarmers) {
       setError('Each farmer can only be added once. Remove duplicate farmer rows before continuing.')
       return
@@ -451,6 +455,7 @@ export default function CottonLotForm() {
             <input
               type="date"
               value={lotDate}
+              max={today()}
               onChange={(e) => setLotDate(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2"
             />
