@@ -36,7 +36,6 @@ export default function CottonLotsReportPage() {
   )
 
   const run = () => {
-    setSelectedSerial('')
     setActive({ ...draft })
   }
 
