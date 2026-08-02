@@ -5,7 +5,7 @@ import ReportShell from '../../components/ReportShell'
 import { printReport, esc } from '../../lib/printReport'
 
 function fmtQty(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 function fmtCcy(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -109,8 +109,8 @@ export default function ItemSalesPage() {
                 <tr key={row.itemId} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-2.5 text-slate-500">{row.categoryName}</td>
                   <td className="px-4 py-2.5 font-medium text-slate-800">{row.itemName}</td>
-                  <td className="px-4 py-2.5 text-right text-slate-700">{fmtQty(row.totalQuantity)}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-slate-800">
+                  <td className="px-4 py-2.5 text-slate-700">{fmtQty(row.totalQuantity)}</td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-800">
                     {fmtCcy(row.totalAmount)}
                   </td>
                 </tr>
@@ -119,8 +119,8 @@ export default function ItemSalesPage() {
             <tfoot className="bg-slate-50 font-semibold">
               <tr>
                 <td colSpan={2} className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Total</td>
-                <td className="px-4 py-3 text-right text-slate-700">{fmtQty(totQty)}</td>
-                <td className="px-4 py-3 text-right text-slate-800">₹{fmtCcy(totAmt)}</td>
+                <td className="px-4 py-3 text-left text-slate-700">{fmtQty(totQty)}</td>
+                <td className="px-4 py-3 text-left text-slate-800">₹{fmtCcy(totAmt)}</td>
               </tr>
             </tfoot>
           </table>

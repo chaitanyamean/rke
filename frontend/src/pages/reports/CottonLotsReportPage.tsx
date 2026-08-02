@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCottonLots } from '../../api/cotton'
 import { useAuth } from '../../auth/AuthContext'
 import ReportShell from '../../components/ReportShell'
+import SearchSelect from '../../components/SearchSelect'
 import { printReport, esc } from '../../lib/printReport'
 
 function fmtQty(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 function fmtCcy(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -17,11 +18,27 @@ export default function CottonLotsReportPage() {
 
   const [draft, setDraft] = useState({ fromDate: '2026-04-01', toDate: today })
   const [active, setActive] = useState({ fromDate: '2026-04-01', toDate: today })
+  const [selectedSerial, setSelectedSerial] = useState('')
 
-  const { data: lots = [], isLoading } = useCottonLots(active.fromDate, active.toDate)
+  const { data: allLots = [], isLoading } = useCottonLots(active.fromDate, active.toDate)
   const { isAdmin } = useAuth()
 
-  const run = () => setActive({ ...draft })
+  // Filter by selected serial if one is chosen
+  const lots = useMemo(
+    () => selectedSerial ? allLots.filter(l => l.vehicleSerialNumber === selectedSerial) : allLots,
+    [allLots, selectedSerial]
+  )
+
+  // Serial number options for the SearchSelect
+  const serialOptions = useMemo(
+    () => allLots.map(l => ({ id: l.vehicleSerialNumber, label: l.vehicleSerialNumber })),
+    [allLots]
+  )
+
+  const run = () => {
+    setSelectedSerial('')
+    setActive({ ...draft })
+  }
 
   const totalQty    = lots.reduce((s, l) => s + l.totalQuantity, 0)
   const totalAmount = lots.reduce((s, l) => s + l.totalAmount, 0)
@@ -81,6 +98,15 @@ export default function CottonLotsReportPage() {
 
   const filters = (
     <>
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">Serial Number</span>
+        <SearchSelect
+          options={serialOptions}
+          value={selectedSerial}
+          onChange={setSelectedSerial}
+          placeholder="Search serial…"
+        />
+      </label>
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">From</span>
         <input

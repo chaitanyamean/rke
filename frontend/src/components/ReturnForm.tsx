@@ -303,7 +303,10 @@ export default function ReturnForm() {
                       <input
                         type="text"
                         value={qtyStr}
-                        onChange={(e) => handleQty(item.itemId, e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '' || /^\d+$/.test(val)) handleQty(item.itemId, val)
+                        }}
                         disabled={!checked || fullyReturned}
                         className={`w-20 rounded border px-2 py-1 text-sm disabled:bg-slate-50 ${
                           (qtyError || (qtyStr && isNaN(parseFloat(qtyStr)))) ? 'border-red-400' : 'border-slate-300'

@@ -527,9 +527,8 @@ function LineRow({ line, items, isDuplicate = false, onItemChange, onQtyChange, 
           type="text"
           value={line.quantity}
           onChange={(e) => {
-            // Only allow digits and a single decimal point
             const val = e.target.value
-            if (val === '' || /^\d*\.?\d*$/.test(val)) onQtyChange(val)
+            if (val === '' || /^\d+$/.test(val)) onQtyChange(val)
           }}
           placeholder="0"
           disabled={!line.itemId}

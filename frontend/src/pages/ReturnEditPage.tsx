@@ -132,15 +132,13 @@ export default function ReturnEditPage() {
               <div className="flex items-center gap-1">
                 <span className="text-xs text-slate-500">Return qty:</span>
                 <input
-                  type="number"
-                  min="0.001"
-                  step="any"
+                  type="text"
                   value={line.quantity}
-                  onChange={(e) =>
-                    setLines((prev) =>
-                      prev.map((l, i) => (i === idx ? { ...l, quantity: e.target.value } : l)),
-                    )
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || /^\d+$/.test(val))
+                      setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, quantity: val } : l)))
+                  }}
                   className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
                 />
               </div>

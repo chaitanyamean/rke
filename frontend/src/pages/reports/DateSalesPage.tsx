@@ -86,8 +86,9 @@ export default function DateSalesPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Date', 'Cash Sales (₹)', 'Credit Sales (₹)', 'Returns (₹)', 'Day Total (₹)'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 text-left">Date</th>
+                {['Cash Sales (₹)', 'Credit Sales (₹)', 'Returns (₹)', 'Day Total (₹)'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">{h}</th>
                 ))}
               </tr>
             </thead>

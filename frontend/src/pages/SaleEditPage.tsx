@@ -179,15 +179,13 @@ export default function SaleEditPage({ saleType }: Props) {
                 <div className="w-24">
                   <span className="mb-1 block text-xs font-medium text-slate-500">Qty</span>
                   <input
-                    type="number"
-                    min="0.001"
-                    step="any"
+                    type="text"
                     value={line.quantity}
-                    onChange={(e) =>
-                      setLines((prev) =>
-                        prev.map((l, i) => (i === idx ? { ...l, quantity: e.target.value } : l)),
-                      )
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '' || /^\d+$/.test(val))
+                        setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, quantity: val } : l)))
+                    }}
                     className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
                   />
                 </div>

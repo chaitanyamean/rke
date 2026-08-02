@@ -101,13 +101,12 @@ function EntryRow({ row, villages, commonPrice, isDuplicate = false, onChange, o
         <input
           type="text"
           value={row.quantity}
-          onChange={(e) => onChange({ quantity: e.target.value })}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '' || /^\d+$/.test(val)) onChange({ quantity: val })
+          }}
           placeholder="Qty"
-          className={`w-full rounded border px-2 py-1.5 text-sm ${
-            row.quantity && isNaN(parseFloat(row.quantity))
-              ? 'border-red-400'
-              : 'border-slate-300'
-          }`}
+          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
         />
       </td>
 

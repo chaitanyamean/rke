@@ -32,7 +32,7 @@ function fmtCcy(n: number) {
 
 function fmtQty(n: number | null) {
   if (n === null || n === 0) return '—'
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 /** Group flat rows by transactionId, preserving order. */

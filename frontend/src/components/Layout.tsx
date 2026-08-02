@@ -154,7 +154,7 @@ export default function Layout() {
 
       {/* Main content — offset by the sidebar width on md+ */}
       <div className="md:pl-64">
-        <main className="mx-auto max-w-6xl px-4 py-6">
+        <main className="mx-auto px-4 py-6">
           <Outlet />
         </main>
       </div>
