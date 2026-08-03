@@ -70,12 +70,53 @@ export default function FarmerLedgerPage() {
 
   const groups = groupByTransaction(data)
 
-  // Footer totals — one row per transaction to avoid double-counting
+  // Compute interest per transaction group.
+  // Formula: if PrevBalance < 0 → |PrevBalance| * days * 24 / 365 / 100
+  // (24% annual rate, balance is negative when farmer owes money)
+  const INTEREST_RATE = 24 // % per annum
   const firstRows = groups.map((g) => g[0])
+
+  const interestByTransactionId = new Map<string, number>()
+  for (let i = 1; i < firstRows.length; i++) {
+    const prev = firstRows[i - 1]
+    const curr = firstRows[i]
+    if (prev.runningBalance < 0) {
+      const [py, pm, pd] = prev.transactionDate.split('-').map(Number)
+      const [cy, cm, cdd] = curr.transactionDate.split('-').map(Number)
+      const prevDate = new Date(py, pm - 1, pd)
+      const currDate = new Date(cy, cm - 1, cdd)
+      const days = Math.max(0, (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+      const interest = Math.abs(prev.runningBalance) * days * INTEREST_RATE / 365 / 100
+      interestByTransactionId.set(curr.transactionId, interest)
+    } else {
+      interestByTransactionId.set(curr.transactionId, 0)
+    }
+  }
+  // First transaction has no previous — interest is 0
+  if (firstRows.length > 0) {
+    interestByTransactionId.set(firstRows[0].transactionId, 0)
+  }
+
+  // Trailing interest: if the last transaction's closing balance is negative,
+  // compute interest from that date to today.
+  const closingBalance = firstRows.length > 0 ? firstRows[firstRows.length - 1].runningBalance : 0
+  const trailingInterest = (() => {
+    if (firstRows.length === 0 || closingBalance >= 0) return 0
+    const lastRow = firstRows[firstRows.length - 1]
+    // Parse as local date to avoid UTC timezone offset issues
+    const [ly, lm, ld] = lastRow.transactionDate.split('-').map(Number)
+    const lastDate = new Date(ly, lm - 1, ld)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const days = Math.max(0, (today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24))
+    return Math.abs(closingBalance) * days * INTEREST_RATE / 365 / 100
+  })()
+
+  // Footer totals — one row per transaction to avoid double-counting
   const totalDebit     = firstRows.reduce((s, r) => s + r.debitAmount, 0)
   const totalCredit    = firstRows.reduce((s, r) => s + r.creditAmount, 0)
-  const totalInterest  = firstRows.reduce((s, r) => s + r.interestAmount, 0)
-  const closingBalance = firstRows.length > 0 ? firstRows[firstRows.length - 1].runningBalance : 0
+  const totalInterest  = firstRows.reduce((s, r) => s + (interestByTransactionId.get(r.transactionId) ?? 0), 0)
+                         + trailingInterest
 
   const run = () => {
     if (!farmer) return
@@ -108,14 +149,14 @@ export default function FarmerLedgerPage() {
           <td class="right">${row.price ? fmtCcy(row.price) : '—'}</td>
           ${isFirst ? `<td${spanAttr} class="right">${first.debitAmount > 0 ? `<span class="debit">₹${fmtCcy(first.debitAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
           ${isFirst ? `<td${spanAttr} class="right">${first.creditAmount > 0 ? `<span class="credit">+₹${fmtCcy(first.creditAmount)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
-          ${isFirst ? `<td${spanAttr} class="right">${fmtCcy(first.interestAmount)}</td>` : ''}
+          ${isFirst ? `<td${spanAttr} class="right">${fmtCcy(interestByTransactionId.get(first.transactionId) ?? 0)}</td>` : ''}
           ${isFirst ? `<td${spanAttr} class="right ${balClass}">${fmtCcy(first.runningBalance)}</td>` : ''}
           ${isFirst ? `<td${spanAttr}>${esc(first.remarks)}</td>` : ''}
         </tr>`
       })
     ).join('')
 
-    const { label: closingLabel, direction: closingDir } = formatBalance(closingBalance)
+    const { label: closingLabel, direction: closingDir } = formatBalance(closingBalance - totalInterest)
     const closingCls = closingDir === 'owes' ? 'bal-neg' : closingDir === 'credit' ? 'bal-pos' : 'muted'
 
     const table = `<table>
@@ -252,8 +293,11 @@ export default function FarmerLedgerPage() {
                               ? <span className="text-green-700">+₹{fmtCcy(first.creditAmount)}</span>
                               : <span className="text-slate-500">—</span>}
                           </td>
-                          <td rowSpan={rowspan} className="px-3 py-2.5 text-right text-slate-600 align-top">
-                            {fmtCcy(first.interestAmount)}
+                          <td rowSpan={rowspan} className="px-3 py-2.5 text-right font-bold text-red-600 align-top">
+                            {(() => {
+                              const interest = interestByTransactionId.get(first.transactionId) ?? 0
+                              return interest > 0 ? fmtCcy(interest) : '—'
+                            })()}
                           </td>
                           <td rowSpan={rowspan} className={`px-3 py-2.5 text-right font-bold align-top ${
                             first.runningBalance < 0 ? 'text-red-700' :
@@ -287,9 +331,10 @@ export default function FarmerLedgerPage() {
                 </td>
                 <td className="px-3 py-3 text-right text-red-700">₹{fmtCcy(totalDebit)}</td>
                 <td className="px-3 py-3 text-right text-green-700">+₹{fmtCcy(totalCredit)}</td>
-                <td className="px-3 py-3 text-right text-slate-500">{fmtCcy(totalInterest)}</td>
+                <td className="px-3 py-3 text-right font-bold text-red-600">{fmtCcy(totalInterest)}</td>
                 {(() => {
-                  const { label, direction: dir } = formatBalance(closingBalance)
+                  const adjustedBalance = closingBalance - totalInterest
+                  const { label, direction: dir } = formatBalance(adjustedBalance)
                   return (
                     <td colSpan={colCount - 10} className={`px-3 py-3 text-right text-base font-bold ${
                       dir === 'owes' ? 'text-red-700' :
