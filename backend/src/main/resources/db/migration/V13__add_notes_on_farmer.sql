@@ -1,0 +1,2 @@
+create table notes_on_farmer(id UUID DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, tenant_id UUID NOT NULL REFERENCES tenants(id) , farmer_id UUID NOT NULL REFERENCES farmers(id) , user_id UUID NOT NULL REFERENCES staff_users(id) , content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX idx_notes_on_farmer_farmer_id ON notes_on_farmer(farmer_id);
