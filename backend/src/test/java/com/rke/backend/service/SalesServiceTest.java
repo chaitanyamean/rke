@@ -40,6 +40,8 @@ import com.rke.backend.repository.TransactionItemRepository;
 import com.rke.backend.repository.TransactionRepository;
 import com.rke.backend.security.CurrentUserService;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
@@ -54,6 +56,7 @@ class SalesServiceTest {
     private AuditService auditService;
     private CurrentUserService currentUserService;
     private EntityManager entityManager;
+    private Tracer tracer;
 
     private SalesService service;
 
@@ -76,11 +79,26 @@ class SalesServiceTest {
         currentUserService = mock(CurrentUserService.class);
         entityManager = mock(EntityManager.class);
 
+        // Micrometer Tracing mocks: Tracer returns a no-op Span and SpanInScope.
+        tracer = mock(Tracer.class);
+        Span mockSpan = mock(Span.class);
+        // Span fluent chain: nextSpan() → name("...") → start() → (tag/error/end)
+        when(tracer.nextSpan()).thenReturn(mockSpan);
+        when(mockSpan.name(any())).thenReturn(mockSpan);
+        when(mockSpan.start()).thenReturn(mockSpan);
+        when(mockSpan.tag(any(String.class), any(String.class))).thenReturn(mockSpan);
+        when(mockSpan.error(any())).thenReturn(mockSpan);
+        when(tracer.withSpan(any())).thenReturn(mock(Tracer.SpanInScope.class));
+        when(tracer.currentSpan()).thenReturn(mockSpan);
+        io.micrometer.tracing.TraceContext mockContext = mock(io.micrometer.tracing.TraceContext.class);
+        when(mockSpan.context()).thenReturn(mockContext);
+        when(mockContext.traceId()).thenReturn("test-trace-id");
+
         service = new SalesService(
                 transactionRepository, transactionItemRepository,
                 farmerRepository, itemRepository,
                 billNumberTypeRepository, billNumberSequenceRepository,
-                auditService, currentUserService, entityManager);
+                auditService, currentUserService, entityManager, tracer);
 
         when(currentUserService.getTenantId()).thenReturn(TENANT_ID);
 

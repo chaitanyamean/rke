@@ -20,6 +20,9 @@
     <properties>
         <java.version>21</java.version>
         <aws.sdk.version>2.26.7</aws.sdk.version>
+        <!-- datasource-micrometer 1.x is compatible with Spring Boot 3.x.
+             2.x is for Spring Boot 4.x — do NOT upgrade until SB4 migration. -->
+        <datasource-micrometer.version>1.5.0</datasource-micrometer.version>
     </properties>
 
     <dependencies>
@@ -49,8 +52,7 @@
 
         <!-- Observability: Actuator + Micrometer Tracing bridge to OpenTelemetry.
              Enables manually-created spans (e.g. wrapping @Transactional service
-             methods) that share context with the auto-instrumentation provided by
-             the OpenTelemetry Java agent. -->
+             methods) that share context with auto-instrumented spans. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -58,6 +60,39 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+
+        <!-- OTLP span exporter: sends traces to any OTLP-compatible collector
+             (OTEL Collector, Grafana Tempo, Honeycomb, etc.) over gRPC.
+             Version is managed by the Spring Boot BOM (1.37.0 for SB 3.3.2). -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+
+        <!-- SDK autoconfigure extension: reads OTEL_* environment variables and
+             system properties (service.name, exporter endpoint, sampler, etc.)
+             Version is managed by the Spring Boot BOM. -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+        </dependency>
+
+        <!-- JDBC/DataSource instrumentation via Micrometer Observation API.
+             datasource-micrometer-spring-boot auto-configures a proxy DataSource
+             that records connection and query spans.
+             datasource-micrometer-opentelemetry adds OpenTelemetry semantic
+             convention attributes (db.system, db.statement, db.operation, etc.).
+             1.x series is compatible with Spring Boot 3.x. -->
+        <dependency>
+            <groupId>net.ttddyy.observation</groupId>
+            <artifactId>datasource-micrometer-spring-boot</artifactId>
+            <version>${datasource-micrometer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.ttddyy.observation</groupId>
+            <artifactId>datasource-micrometer-opentelemetry</artifactId>
+            <version>${datasource-micrometer.version}</version>
         </dependency>
 
         <!-- Structured JSON logging with trace_id / span_id from the MDC. -->

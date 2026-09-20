@@ -5,6 +5,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,17 +23,22 @@ import com.rke.backend.security.CurrentUserService;
 @Service
 public class FarmerService {
 
+    private static final Logger log = LoggerFactory.getLogger(FarmerService.class);
+
     private final FarmerRepository repository;
     private final VillageRepository villageRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
+    private final Tracer tracer;
 
     public FarmerService(FarmerRepository repository, VillageRepository villageRepository,
-                         AuditService auditService, CurrentUserService currentUserService) {
+                         AuditService auditService, CurrentUserService currentUserService,
+                         Tracer tracer) {
         this.repository = repository;
         this.villageRepository = villageRepository;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
+        this.tracer = tracer;
     }
 
     @Transactional(readOnly = true)
@@ -49,36 +58,57 @@ public class FarmerService {
     @Transactional
     public Farmer create(FarmerRequest request) {
         requireVillage(request.villageId());
-        Farmer farmer = Farmer.builder()
-                .tenantId(currentUserService.getTenantId())
-                .name(request.name().trim())
-                .fatherName(trimToNull(request.fatherName()))
-                .villageId(request.villageId())
-                .address(trimToNull(request.address()))
-                .mobileNumber(trimToNull(request.mobileNumber()))
-                .reference(trimToNull(request.reference()))
-                .build();
-        farmer = repository.save(farmer);
-        auditService.record("farmers", farmer.getId(), AuditAction.INSERT,
-                null, auditService.snapshot(farmer));
-        return farmer;
+        Span span = tracer.nextSpan().name("farmer.create").start();
+        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+            span.tag("farmer.village_id", request.villageId().toString());
+            Farmer farmer = Farmer.builder()
+                    .tenantId(currentUserService.getTenantId())
+                    .name(request.name().trim())
+                    .fatherName(trimToNull(request.fatherName()))
+                    .villageId(request.villageId())
+                    .address(trimToNull(request.address()))
+                    .mobileNumber(trimToNull(request.mobileNumber()))
+                    .reference(trimToNull(request.reference()))
+                    .build();
+            farmer = repository.save(farmer);
+            span.tag("farmer.id", farmer.getId().toString());
+            auditService.record("farmers", farmer.getId(), AuditAction.INSERT,
+                    null, auditService.snapshot(farmer));
+            log.info("Farmer created: id={}", farmer.getId());
+            return farmer;
+        } catch (Exception e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @Transactional
     public Farmer update(UUID id, FarmerRequest request) {
         requireVillage(request.villageId());
-        Farmer farmer = get(id);
-        Map<String, Object> before = auditService.snapshot(farmer);
-        farmer.setName(request.name().trim());
-        farmer.setFatherName(trimToNull(request.fatherName()));
-        farmer.setVillageId(request.villageId());
-        farmer.setAddress(trimToNull(request.address()));
-        farmer.setMobileNumber(trimToNull(request.mobileNumber()));
-        farmer.setReference(trimToNull(request.reference()));
-        farmer = repository.save(farmer);
-        auditService.record("farmers", farmer.getId(), AuditAction.UPDATE,
-                before, auditService.snapshot(farmer));
-        return farmer;
+        Span span = tracer.nextSpan().name("farmer.update").start();
+        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+            span.tag("farmer.id", id.toString());
+            Farmer farmer = get(id);
+            Map<String, Object> before = auditService.snapshot(farmer);
+            farmer.setName(request.name().trim());
+            farmer.setFatherName(trimToNull(request.fatherName()));
+            farmer.setVillageId(request.villageId());
+            farmer.setAddress(trimToNull(request.address()));
+            farmer.setMobileNumber(trimToNull(request.mobileNumber()));
+            farmer.setReference(trimToNull(request.reference()));
+            farmer = repository.save(farmer);
+            auditService.record("farmers", farmer.getId(), AuditAction.UPDATE,
+                    before, auditService.snapshot(farmer));
+            log.info("Farmer updated: id={}", farmer.getId());
+            return farmer;
+        } catch (Exception e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     private void requireVillage(UUID villageId) {

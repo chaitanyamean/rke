@@ -1,23 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <!--
-      Structured JSON logging to the console.
+      Structured JSON logging to stdout.
 
-      The OpenTelemetry Java agent injects `trace_id`, `span_id` and `trace_flags`
-      into SLF4J's MDC for every log statement emitted inside an active span. The
-      LogstashEncoder includes all MDC entries as top-level JSON fields by default,
-      so every log line can be correlated back to the exact request/trace that
-      produced it. This is what lets us later trace a suspicious farmer-ledger entry
-      back to the sale/payment/return request that wrote it.
+      Micrometer Tracing (via the micrometer-tracing-bridge-otel bridge) writes the
+      following MDC keys for every log statement emitted inside an active span:
+
+          traceId    — 32-hex-char W3C trace identifier
+          spanId     — 16-hex-char span identifier
+          sampled    — "true" / "false"
+
+      LogstashEncoder includes all MDC entries as top-level JSON fields automatically
+      (includeMdc=true below), so every log line is automatically correlated to the
+      exact HTTP request and database operation that produced it.
+
+      Example log line (pretty-printed for readability):
+      {
+        "timestamp": "2026-09-20T09:00:00.000Z",
+        "level": "INFO",
+        "logger": "c.r.b.service.SalesService",
+        "message": "Creating sale for farmer ...",
+        "service": "rke-backend",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "spanId":  "00f067aa0ba902b7",
+        "sampled": "true"
+      }
+
+      These traceId / spanId values are real OpenTelemetry trace IDs and can be used
+      to look up the corresponding trace in any OTEL-compatible backend (Jaeger, Tempo,
+      Honeycomb, etc.) once the collector is configured (Phase 3).
     -->
-    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="rke-backend"/>
+    <springProperty scope="context" name="appName"
+                    source="spring.application.name" defaultValue="rke-backend"/>
 
     <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <!-- Include all MDC keys (trace_id, span_id, trace_flags, ...) as JSON fields. -->
+            <!-- Include all MDC keys as JSON fields (traceId, spanId, sampled, ...). -->
             <includeMdc>true</includeMdc>
             <includeContext>false</includeContext>
+            <!-- Fixed service metadata on every log line. -->
             <customFields>{"service":"${appName}"}</customFields>
+
+            <!--
+              Explicitly promote the trace correlation keys to the top level of the
+              JSON object so they are never nested under "mdc".
+              This ensures compatibility with log-aggregation queries that expect
+              traceId at the root (e.g. in Grafana Loki or OpenSearch).
+            -->
+            <provider class="net.logstash.logback.composite.loggingevent.MdcJsonProvider">
+                <fieldName>traceId</fieldName>
+                <fieldName>spanId</fieldName>
+                <fieldName>sampled</fieldName>
+            </provider>
         </encoder>
     </appender>
 

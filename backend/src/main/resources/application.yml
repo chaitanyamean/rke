@@ -54,6 +54,57 @@ logging:
   level:
     org.flywaydb: info
     com.rke.backend.simulation: info
+    # Suppress noisy OTLP gRPC export failures when no collector is running.
+    # At INFO we still see the "connection refused" warning once on startup.
+    io.opentelemetry.exporter.internal: warn
+    net.ttddyy.observation: info
+
+# ----------------------------------------------------------------------------
+# Micrometer Tracing (Spring Boot's tracing facade)
+# ----------------------------------------------------------------------------
+management:
+  tracing:
+    # Sample 100 % of requests in dev/test.  Override to a lower value
+    # (e.g. 0.1) in production to reduce export volume.
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+    # Propagate W3C TraceContext + Baggage headers (interoperable with all
+    # modern OTEL-aware services and the OTEL Collector).
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      # OTLP/gRPC endpoint for the span exporter.
+      # Leave blank to disable export (spans are still created locally).
+      # In Docker Compose this is set to http://otel-collector:4317.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+  # Expose the health and tracing actuator endpoints.
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# ----------------------------------------------------------------------------
+# OpenTelemetry resource attributes
+# These are read by OpenTelemetryConfig to populate the SDK Resource.
+# ----------------------------------------------------------------------------
+otel:
+  service:
+    name: ${OTEL_SERVICE_NAME:rke-backend}
+  deployment:
+    environment: ${DEPLOYMENT_ENVIRONMENT:development}
+
+# ----------------------------------------------------------------------------
+# datasource-micrometer JDBC instrumentation
+# Wraps the HikariCP DataSource in an observation proxy so every JDBC
+# connection and statement produces a child span under the active trace.
+# ----------------------------------------------------------------------------
+jdbc:
+  datasource-proxy:
+    enabled: true
+    # Include the SQL statement text in the db.statement span attribute.
+    # Set to false in production if SQL contains sensitive data.
+    include-parameter-values: false
 
 # ----------------------------------------------------------------------------
 # Incident simulation framework — dev/test only.

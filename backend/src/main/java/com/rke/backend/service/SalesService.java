@@ -9,6 +9,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +45,8 @@ import jakarta.persistence.EntityManager;
 @Service
 public class SalesService {
 
+    private static final Logger log = LoggerFactory.getLogger(SalesService.class);
+
     private final TransactionRepository transactionRepository;
     private final TransactionItemRepository transactionItemRepository;
     private final FarmerRepository farmerRepository;
@@ -50,6 +56,7 @@ public class SalesService {
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
     private final EntityManager entityManager;
+    private final Tracer tracer;
 
     public SalesService(TransactionRepository transactionRepository,
                         TransactionItemRepository transactionItemRepository,
@@ -59,7 +66,8 @@ public class SalesService {
                         BillNumberSequenceRepository billNumberSequenceRepository,
                         AuditService auditService,
                         CurrentUserService currentUserService,
-                        EntityManager entityManager) {
+                        EntityManager entityManager,
+                        Tracer tracer) {
         this.transactionRepository = transactionRepository;
         this.transactionItemRepository = transactionItemRepository;
         this.farmerRepository = farmerRepository;
@@ -69,6 +77,7 @@ public class SalesService {
         this.auditService = auditService;
         this.currentUserService = currentUserService;
         this.entityManager = entityManager;
+        this.tracer = tracer;
     }
 
     /**
@@ -76,74 +85,98 @@ public class SalesService {
      *
      * <p>All inputs are fully validated before any DB write — a failure mid-list
      * still rolls back cleanly because nothing is written until after validation.
+     *
+     * <p>A Micrometer Tracing child span ({@code sale.create}) is opened for the
+     * duration of this method so the sale type, farmer, and outcome appear as
+     * span attributes in the distributed trace alongside the JDBC child spans
+     * produced by datasource-micrometer.
      */
     @Transactional
     public TransactionResponse createSale(SaleRequest request, TransactionType type) {
-        UUID tenantId = currentUserService.getTenantId();
+        Span span = tracer.nextSpan().name("sale.create").start();
+        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+            span.tag("sale.type", type.name());
+            span.tag("sale.farmer_id", request.farmerId().toString());
+            span.tag("sale.line_items", String.valueOf(request.items().size()));
 
-        // 1. Validate farmer exists (Hibernate filter scopes to tenant automatically).
-        farmerRepository.findById(request.farmerId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Farmer not found: " + request.farmerId()));
+            UUID tenantId = currentUserService.getTenantId();
+            span.tag("tenant.id", tenantId.toString());
 
-        // 2. Validate bill number type and resolve the item category it belongs to.
-        BillNumberType billNumberType = billNumberTypeRepository.findById(request.billNumberTypeId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "BillNumberType not found: " + request.billNumberTypeId()));
+            // 1. Validate farmer exists (Hibernate filter scopes to tenant automatically).
+            farmerRepository.findById(request.farmerId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Farmer not found: " + request.farmerId()));
 
-        // 3. Validate ALL items and compute line amounts — before any write.
-        List<PricedLine> lines = validateAndPriceLines(request.items(), type);
+            // 2. Validate bill number type and resolve the item category it belongs to.
+            BillNumberType billNumberType = billNumberTypeRepository.findById(request.billNumberTypeId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "BillNumberType not found: " + request.billNumberTypeId()));
 
-        BigDecimal grandTotal = lines.stream()
-                .map(PricedLine::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 3. Validate ALL items and compute line amounts — before any write.
+            List<PricedLine> lines = validateAndPriceLines(request.items(), type);
 
-        // 4. Resolve bill number (auto or manual) — raises 409 on duplicate.
-        String billNumber = resolveBillNumber(
-                request.billNumber(), tenantId, billNumberType.getItemCategoryId());
+            BigDecimal grandTotal = lines.stream()
+                    .map(PricedLine::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 5. Generate the human-readable transaction number: {YYYY}-{billNumber}-{increment}.
-        String transactionNo = generateTransactionNo(tenantId, billNumber);
+            // 4. Resolve bill number (auto or manual) — raises 409 on duplicate.
+            String billNumber = resolveBillNumber(
+                    request.billNumber(), tenantId, billNumberType.getItemCategoryId());
 
-        // 6. Now write: transaction header first.
-        Transaction tx = Transaction.builder()
-                .tenantId(tenantId)
-                .farmerId(request.farmerId())
-                .billNumber(billNumber)
-                .transactionNo(transactionNo)
-                .billNumberTypeId(request.billNumberTypeId())
-                .transactionType(type)
-                .transactionDate(request.transactionDate())
-                .grandTotal(grandTotal)
-                .remarks(request.remarks())
-                .status(TransactionStatus.ACTIVE)
-                .build();
+            // 5. Generate the human-readable transaction number: {YYYY}-{billNumber}-{increment}.
+            String transactionNo = generateTransactionNo(tenantId, billNumber);
 
-        transactionRepository.save(tx);
-
-        // 7. Write line items.
-        List<TransactionItem> savedItems = new ArrayList<>(lines.size());
-        for (PricedLine line : lines) {
-            TransactionItem item = TransactionItem.builder()
+            // 6. Now write: transaction header first.
+            Transaction tx = Transaction.builder()
                     .tenantId(tenantId)
-                    .transactionId(tx.getId())
-                    .itemId(line.itemId())
-                    .quantity(line.quantity())
-                    .price(line.price())
-                    .amount(line.amount())
+                    .farmerId(request.farmerId())
+                    .billNumber(billNumber)
+                    .transactionNo(transactionNo)
+                    .billNumberTypeId(request.billNumberTypeId())
+                    .transactionType(type)
+                    .transactionDate(request.transactionDate())
+                    .grandTotal(grandTotal)
+                    .remarks(request.remarks())
+                    .status(TransactionStatus.ACTIVE)
                     .build();
-            savedItems.add(transactionItemRepository.save(item));
+
+            transactionRepository.save(tx);
+
+            // 7. Write line items.
+            List<TransactionItem> savedItems = new ArrayList<>(lines.size());
+            for (PricedLine line : lines) {
+                TransactionItem item = TransactionItem.builder()
+                        .tenantId(tenantId)
+                        .transactionId(tx.getId())
+                        .itemId(line.itemId())
+                        .quantity(line.quantity())
+                        .price(line.price())
+                        .amount(line.amount())
+                        .build();
+                savedItems.add(transactionItemRepository.save(item));
+            }
+
+            // 8. Audit.
+            auditService.record("transactions", tx.getId(), AuditAction.INSERT, null,
+                    auditService.snapshot(tx));
+
+            List<TransactionItemResponse> itemResponses = savedItems.stream()
+                    .map(TransactionItemResponse::from)
+                    .toList();
+
+            TransactionResponse response = TransactionResponse.from(tx, itemResponses);
+            span.tag("sale.bill_number", tx.getBillNumber());
+            span.tag("sale.transaction_id", tx.getId().toString());
+            log.info("Sale created: type={} billNumber={} grandTotal={} traceId={}",
+                    type, tx.getBillNumber(), grandTotal,
+                    tracer.currentSpan() != null ? tracer.currentSpan().context().traceId() : "n/a");
+            return response;
+        } catch (Exception e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
         }
-
-        // 8. Audit.
-        auditService.record("transactions", tx.getId(), AuditAction.INSERT, null,
-                auditService.snapshot(tx));
-
-        List<TransactionItemResponse> itemResponses = savedItems.stream()
-                .map(TransactionItemResponse::from)
-                .toList();
-
-        return TransactionResponse.from(tx, itemResponses);
     }
 
     /**
