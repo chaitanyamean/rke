@@ -1,6 +1,7 @@
 package com.rke.backend.config;
 
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
@@ -11,7 +12,6 @@ import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
-import io.opentelemetry.semconv.ServiceAttributes;
 import io.opentelemetry.extension.trace.propagation.B3Propagator;
 
 import org.slf4j.Logger;
@@ -80,11 +80,13 @@ public class OpenTelemetryConfig {
      */
     @Bean
     public OpenTelemetry openTelemetry() {
+        // "service.name" is the stable OTel semantic convention key.
+        // Using AttributeKey.stringKey directly avoids the opentelemetry-semconv
+        // alpha jar which is not reliably available in offline Maven builds.
         Resource resource = Resource.getDefault().toBuilder()
                 .putAll(Attributes.of(
-                        ServiceAttributes.SERVICE_NAME, serviceName,
-                        io.opentelemetry.api.common.AttributeKey.stringKey("deployment.environment"),
-                        deploymentEnvironment))
+                        AttributeKey.stringKey("service.name"), serviceName,
+                        AttributeKey.stringKey("deployment.environment"), deploymentEnvironment))
                 .build();
 
         Sampler sampler = (samplingProbability >= 1.0)

@@ -80,11 +80,11 @@ services:
       jaeger:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/health"]
+      test: ["CMD", "/otelcol-contrib", "--version"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -105,10 +105,13 @@ services:
       DB_USERNAME: ${DB_USERNAME:-rke}
       DB_PASSWORD: ${DB_PASSWORD:-rke}
 
+      # ---- Spring profile — enables simulation endpoints ----
+      SPRING_PROFILES_ACTIVE: dev
+
       # ---- OpenTelemetry ----
       # Endpoint read by OpenTelemetryConfig (management.otlp.tracing.endpoint).
       # Traces go to the OTEL Collector, which fans out to Jaeger and debug.
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: rke-backend
       DEPLOYMENT_ENVIRONMENT: development
       OTEL_SAMPLING_PROBABILITY: "1.0"

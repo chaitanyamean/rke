@@ -120,4 +120,9 @@ service:
     logs:
       level: info
     metrics:
-      address: 0.0.0.0:8888   # Prometheus self-metrics on /metrics
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888   # Prometheus self-metrics on /metrics
