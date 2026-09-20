@@ -5,6 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,11 +16,30 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.rke.backend.simulation.SimulationException;
+
 /**
  * Translates common exceptions into clean JSON error responses.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * Controlled simulation failures propagate as HTTP 500 so the RCA agent
+     * sees realistic error responses.  The incident identifier is embedded in
+     * the message to make log correlation straightforward.
+     */
+    @ExceptionHandler(SimulationException.class)
+    public ResponseEntity<Map<String, Object>> handleSimulation(SimulationException ex) {
+        log.error("Simulation failure triggered: incidentId={} message={}",
+                ex.getIncidentId(), ex.getMessage(), ex);
+        Map<String, Object> body = base(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        body.put("incidentId", ex.getIncidentId());
+        body.put("simulatedFailure", true);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
 
     /** Bean Validation failures on {@code @Valid} request bodies -> 400 with per-field messages. */
     @ExceptionHandler(MethodArgumentNotValidException.class)

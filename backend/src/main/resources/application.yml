@@ -1,7 +1,14 @@
 server:
   port: 8080
 
+# Active profile controls whether simulation endpoints are registered.
+# Override via -Dspring.profiles.active=prod (or SPRING_PROFILES_ACTIVE=prod env var)
+# to disable all simulation endpoints.
+# Default is 'dev' so the app works out-of-the-box locally.
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   application:
     name: rke-backend
 
@@ -46,3 +53,16 @@ app:
 logging:
   level:
     org.flywaydb: info
+    com.rke.backend.simulation: info
+
+# ----------------------------------------------------------------------------
+# Incident simulation framework — dev/test only.
+# These properties are consumed by ConfigRegressionScenario.
+# The known-good default is max-items-per-order: 50.
+# To activate the INC-004 regression, set max-items-per-order: 0
+# (either here or in application-simulation.yml, which is committed as the
+# "bad configuration" state for RCA agent correlation).
+# ----------------------------------------------------------------------------
+simulation:
+  config-regression:
+    max-items-per-order: ${SIMULATION_MAX_ITEMS_PER_ORDER:50}

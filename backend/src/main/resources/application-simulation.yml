@@ -1,0 +1,42 @@
+# ============================================================================
+# application-simulation.yml
+#
+# Spring profile: "simulation"
+#
+# PURPOSE
+# -------
+# This file represents the KNOWN-BAD configuration state for INC-004
+# (Configuration Regression scenario).
+#
+# WHAT IT CHANGES
+# ---------------
+# simulation.config-regression.max-items-per-order is set to 0 (broken value).
+# The known-good value is 50 (set in application.yml).
+#
+# GIT CORRELATION
+# ---------------
+# The diff of this file is the Git-visible change that the RCA agent
+# should correlate with the INC-004 incident:
+#
+#   known-good:  max-items-per-order: 50
+#   regression:  max-items-per-order: 0   ← this file
+#
+# HOW TO TRIGGER THE REGRESSION
+# ------------------------------
+# 1. Start the app with this profile active:
+#      SPRING_PROFILES_ACTIVE=dev,simulation ./mvnw spring-boot:run
+#    or:
+#      -Dspring.profiles.active=dev,simulation
+#
+# 2. POST /api/test/incidents/config-regression
+#    → HTTP 500 with CONFIGURATION REGRESSION DETECTED in the message.
+#
+# HOW TO RESET
+# ------------
+# Remove "simulation" from SPRING_PROFILES_ACTIVE, or
+# POST /api/test/incidents/reset (disables the runtime flag but does not
+# change the active Spring profile).
+# ============================================================================
+simulation:
+  config-regression:
+    max-items-per-order: 0
