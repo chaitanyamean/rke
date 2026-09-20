@@ -1,4 +1,8 @@
 services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: rke-postgres
@@ -7,7 +11,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-rke}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-rke}
     ports:
-      # Host 5433 -> container 5432 (avoids clashing with a local postgres on 5432)
+      # Host 5433 → container 5432 (avoids clashing with a local Postgres on 5432)
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -17,6 +21,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry Collector
+  #
+  # Receives OTLP telemetry (gRPC 4317, HTTP 4318) from the RKE backend and
+  # currently exports to its own stdout via the debug exporter.
+  # Phase 4 will add Jaeger as a trace backend.
+  #
+  # Image: otel/opentelemetry-collector-contrib ships all community receivers,
+  # processors, and exporters, including the Jaeger OTLP exporter needed in the
+  # next phase. Using contrib now avoids an image change later.
+  # ---------------------------------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.155.0
     container_name: rke-otel-collector
@@ -24,9 +39,22 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
+      - "4317:4317"    # OTLP gRPC   — primary ingest from RKE
+      - "4318:4318"    # OTLP HTTP   — secondary / curl-based testing
+      - "13133:13133"  # health_check extension (GET /health)
+      - "55679:55679"  # zpages debug UI (http://localhost:55679/debug/tracez)
+      - "8888:8888"    # Collector self-metrics (Prometheus format /metrics)
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # RKE Spring Boot backend
+  # ---------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
@@ -35,18 +63,22 @@ services:
       postgres:
         condition: service_healthy
       otel-collector:
-        condition: service_started
+        condition: service_healthy
     environment:
+      # ---- Database ----
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rke}
       DB_USERNAME: ${DB_USERNAME:-rke}
       DB_PASSWORD: ${DB_PASSWORD:-rke}
-      # ---- OpenTelemetry (read natively by the Java agent) ----
-      OTEL_SERVICE_NAME: rk-enterprises-backend
+
+      # ---- OpenTelemetry ----
+      # Endpoint read by OpenTelemetryConfig (management.otlp.tracing.endpoint).
+      # The otel-collector service name resolves within the Docker Compose network.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-      OTEL_TRACES_EXPORTER: otlp
-      OTEL_METRICS_EXPORTER: otlp
-      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: rke-backend
+      DEPLOYMENT_ENVIRONMENT: development
+      # Sample 100 % of requests in local development.
+      OTEL_SAMPLING_PROBABILITY: "1.0"
+
       # ---- S3 storage (logo uploads) — override via .env ----
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -54,11 +86,15 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_BUCKET: ${S3_BUCKET:-rke-assets}
       S3_PUBLIC_URL_BASE: ${S3_PUBLIC_URL_BASE:-}
+
       # ---- CORS ----
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
     ports:
       - "8000:8080"
 
+  # ---------------------------------------------------------------------------
+  # RKE React frontend
+  # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
