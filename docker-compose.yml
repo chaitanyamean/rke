@@ -22,15 +22,47 @@ services:
       retries: 10
 
   # ---------------------------------------------------------------------------
+  # Jaeger all-in-one (v1)
+  #
+  # Receives OTLP traces from the OTEL Collector via gRPC (port 4317 internal).
+  # The Jaeger UI is available at http://localhost:16686.
+  #
+  # Trace storage: in-memory (badger) — traces are lost on container restart.
+  # This is intentional for local development; no data persistence is needed.
+  #
+  # Port map:
+  #   4317  OTLP/gRPC receiver  — used by the OTEL Collector (internal only)
+  #   16686 Jaeger UI + HTTP API — exposed to the host for browser access
+  # ---------------------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    container_name: rke-jaeger
+    environment:
+      # Enable the OTLP gRPC receiver (introduced in Jaeger v1.35).
+      COLLECTOR_OTLP_ENABLED: "true"
+      # Set the log level to reduce noise in local development.
+      LOG_LEVEL: info
+    ports:
+      - "16686:16686"  # Jaeger UI + query HTTP API
+      # Port 4317 (OTLP/gRPC) is intentionally NOT published to the host —
+      # only the OTEL Collector (within the Docker network) needs to reach it.
+      # This prevents accidental direct RKE → Jaeger connections that bypass
+      # the collector.
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # OpenTelemetry Collector
   #
   # Receives OTLP telemetry (gRPC 4317, HTTP 4318) from the RKE backend and
-  # currently exports to its own stdout via the debug exporter.
-  # Phase 4 will add Jaeger as a trace backend.
-  #
-  # Image: otel/opentelemetry-collector-contrib ships all community receivers,
-  # processors, and exporters, including the Jaeger OTLP exporter needed in the
-  # next phase. Using contrib now avoids an image change later.
+  # fans out traces to:
+  #   - debug exporter   (collector stdout — always active)
+  #   - otlp/jaeger      (Jaeger all-in-one — Phase 4)
   # ---------------------------------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.155.0
@@ -44,6 +76,9 @@ services:
       - "13133:13133"  # health_check extension (GET /health)
       - "55679:55679"  # zpages debug UI (http://localhost:55679/debug/tracez)
       - "8888:8888"    # Collector self-metrics (Prometheus format /metrics)
+    depends_on:
+      jaeger:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/health"]
       interval: 10s
@@ -72,11 +107,10 @@ services:
 
       # ---- OpenTelemetry ----
       # Endpoint read by OpenTelemetryConfig (management.otlp.tracing.endpoint).
-      # The otel-collector service name resolves within the Docker Compose network.
+      # Traces go to the OTEL Collector, which fans out to Jaeger and debug.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: rke-backend
       DEPLOYMENT_ENVIRONMENT: development
-      # Sample 100 % of requests in local development.
       OTEL_SAMPLING_PROBABILITY: "1.0"
 
       # ---- S3 storage (logo uploads) — override via .env ----
@@ -99,7 +133,6 @@ services:
     build:
       context: ./frontend
       args:
-        # Baked into the static bundle; the browser reaches the backend on the host port.
         VITE_API_BASE_URL: http://localhost:8000
     container_name: rke-frontend
     depends_on:

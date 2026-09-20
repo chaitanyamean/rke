@@ -1,9 +1,9 @@
 # =============================================================================
 # OpenTelemetry Collector — RKE local development configuration
 #
-# Phase 3: receives OTLP telemetry from the RKE Spring Boot backend.
-# Phase 4 will add Jaeger as the trace backend by uncommenting the
-# otlp/jaeger exporter block and referencing it in the traces pipeline.
+# Phase 4: receives OTLP telemetry from RKE and exports traces to:
+#   - debug exporter  (collector stdout, always active)
+#   - otlp/jaeger     (Jaeger all-in-one, local UI at http://localhost:16686)
 #
 # Architecture:
 #
@@ -13,69 +13,56 @@
 #       ▼
 #   OTEL Collector  (this config)
 #       │
-#       ├── debug exporter   → collector stdout (always active)
-#       └── [Phase 4] otlp/jaeger → Jaeger
+#       ├── debug exporter   → collector stdout (always on)
+#       └── otlp/jaeger      → Jaeger all-in-one → Jaeger UI :16686
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Extensions
-# Lightweight utilities that enhance the collector itself.
 # -----------------------------------------------------------------------------
 extensions:
 
-  # health_check: exposes GET /health on port 13133.
-  # Used by Docker's HEALTHCHECK and curl-based readiness probes.
+  # health_check: GET /health on port 13133 — used by Docker healthcheck.
   health_check:
     endpoint: 0.0.0.0:13133
 
-  # zpages: HTTP debugging UI on port 55679.
-  # Browse http://localhost:55679/debug/tracez  to inspect live trace samples.
-  # Browse http://localhost:55679/debug/pipelinez to inspect pipeline health.
+  # zpages: browser-based pipeline and trace inspector on port 55679.
+  # http://localhost:55679/debug/tracez   — live trace samples
+  # http://localhost:55679/debug/pipelinez — pipeline health
   zpages:
     endpoint: 0.0.0.0:55679
 
 # -----------------------------------------------------------------------------
 # Receivers
-# Accept telemetry over OTLP from the RKE backend.
+# Accept OTLP telemetry from the RKE backend.
 # -----------------------------------------------------------------------------
 receivers:
 
   otlp:
     protocols:
-      # gRPC — primary protocol used by RKE (OTEL_EXPORTER_OTLP_ENDPOINT).
       grpc:
-        endpoint: 0.0.0.0:4317
-      # HTTP/protobuf — secondary protocol; useful for browser-based or
-      # HTTP-only clients and for testing with curl.
+        endpoint: 0.0.0.0:4317   # primary — used by RKE
       http:
-        endpoint: 0.0.0.0:4318
+        endpoint: 0.0.0.0:4318   # secondary — curl / HTTP-only clients
 
 # -----------------------------------------------------------------------------
 # Processors
-# Transform or filter telemetry before export.
-# Keep this minimal — add processors only when there is a clear reason.
+# Keep this minimal. Order matters: memory_limiter must always be first.
 # -----------------------------------------------------------------------------
 processors:
 
-  # memory_limiter: protects the collector process from OOM under burst load.
-  # Must be the first processor in every pipeline.
+  # memory_limiter: protect the collector from OOM under burst load.
   memory_limiter:
     check_interval: 5s
-    # Hard limit: collector drops telemetry above this RSS.
-    limit_mib: 256
-    # Soft limit: collector starts applying backpressure at 80 % of the hard limit.
-    spike_limit_mib: 64
+    limit_mib: 256       # hard limit — drop telemetry above this RSS
+    spike_limit_mib: 64  # soft limit — backpressure at (limit - spike)
 
-  # batch: groups spans into batches before export.
-  # Reduces outbound connections and improves throughput.
+  # batch: group spans into batches before export for efficiency.
   batch:
-    # Maximum wait time before flushing a partial batch.
     timeout: 5s
-    # Maximum number of spans per batch.
     send_batch_size: 512
 
-  # resource: adds or overrides resource attributes on every span/metric/log.
-  # Used to stamp the telemetry.environment tag so traces are filterable by env.
+  # resource: stamp a deployment tag on all telemetry signals.
   resource:
     attributes:
       - key: telemetry.environment
@@ -84,60 +71,53 @@ processors:
 
 # -----------------------------------------------------------------------------
 # Exporters
-# Send processed telemetry downstream.
 # -----------------------------------------------------------------------------
 exporters:
 
-  # debug: prints telemetry to the collector's stdout.
-  # Set verbosity: basic for one-line summaries, detailed for full span data.
-  # Change to 'normal' or 'basic' in high-traffic environments to reduce noise.
+  # debug: print full telemetry to collector stdout.
+  # Useful for verifying what the collector receives without opening Jaeger.
+  # Switch to verbosity: basic to reduce log volume in busy environments.
   debug:
     verbosity: detailed
 
-  # ---- Phase 4: Jaeger exporter (uncomment when Jaeger is added) -----------
-  # otlp/jaeger:
-  #   endpoint: jaeger:4317          # Jaeger OTLP/gRPC receiver port
-  #   tls:
-  #     insecure: true               # OK for local development over Docker network
-  # -------------------------------------------------------------------------
+  # otlp/jaeger: forward traces to Jaeger via OTLP/gRPC.
+  # Jaeger's OTLP receiver listens on its internal port 4317 (not exposed to
+  # the host — only reachable within the Docker Compose network).
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true   # no TLS needed on a private Docker bridge network
 
 # -----------------------------------------------------------------------------
 # Service
-# Wires receivers → processors → exporters into named pipelines.
-# Each signal (traces / metrics / logs) has its own pipeline.
+# Wires everything together.
 # -----------------------------------------------------------------------------
 service:
 
-  # Extensions must be listed here to be activated.
   extensions: [health_check, zpages]
 
   pipelines:
 
-    # Traces pipeline — the primary signal for Phase 3.
+    # Traces: fan out to both debug (stdout) and Jaeger.
     traces:
       receivers:  [otlp]
-      # memory_limiter must come before batch.
       processors: [memory_limiter, batch, resource]
-      exporters:  [debug]
-      # Phase 4: add otlp/jaeger to exporters → [debug, otlp/jaeger]
+      exporters:  [debug, otlp/jaeger]
 
-    # Metrics pipeline — receives metrics from the RKE actuator/micrometer.
-    # Currently exported to debug only; extend in a later phase if needed.
+    # Metrics: debug only for now.
     metrics:
       receivers:  [otlp]
       processors: [memory_limiter, batch, resource]
       exporters:  [debug]
 
-    # Logs pipeline — receives structured logs forwarded via OTLP.
-    # RKE writes to stdout (JSON); this pipeline is here for completeness.
+    # Logs: debug only for now.
     logs:
       receivers:  [otlp]
       processors: [memory_limiter, batch, resource]
       exporters:  [debug]
 
-  # Collector-internal telemetry (its own logs/metrics).
   telemetry:
     logs:
       level: info
     metrics:
-      address: 0.0.0.0:8888   # Prometheus-format self-metrics on /metrics
+      address: 0.0.0.0:8888   # Prometheus self-metrics on /metrics
