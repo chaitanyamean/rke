@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rke.backend.dto.ChangeMyPasswordRequest;
 import com.rke.backend.dto.StaffUserCreateRequest;
 import com.rke.backend.dto.StaffUserResponse;
 import com.rke.backend.dto.StaffUserUpdateRequest;
@@ -58,5 +59,16 @@ public class StaffUserController {
     public StaffUserResponse update(@PathVariable UUID id,
                                      @Valid @RequestBody StaffUserUpdateRequest request) {
         return service.update(id, request);
+    }
+
+    /**
+     * Lets any admin change their own password. Accessible to ADMIN and SUPER_ADMIN
+     * (the class-level @PreAuthorize already enforces this).
+     * STAFF users cannot reach this controller at all.
+     */
+    @PutMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changeMyPassword(@Valid @RequestBody ChangeMyPasswordRequest request) {
+        service.changeMyPassword(request);
     }
 }

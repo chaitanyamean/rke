@@ -218,8 +218,8 @@ export default function CottonLotForm() {
   const commonPriceValid = !isNaN(parseFloat(commonPrice)) && parseFloat(commonPrice) >= 0
 
   const hasDuplicateFarmers = useMemo(() => {
-    const ids = rows.map((r) => r.farmerId).filter(Boolean)
-    return ids.length !== new Set(ids).size
+    const keys = rows.map((r) => r.farmerId && r.price ? `${r.farmerId}::${r.price}` : '').filter(Boolean)
+    return keys.length !== new Set(keys).size
   }, [rows])
 
   const canReview = rowsValid && commonPriceValid && !!lotDate && lotDate <= today() && !hasDuplicateFarmers
@@ -230,7 +230,7 @@ export default function CottonLotForm() {
       return
     }
     if (hasDuplicateFarmers) {
-      setError('Each farmer can only be added once. Remove duplicate farmer rows before continuing.')
+      setError('Duplicate entry: same farmer with the same price already exists. Use a different price or remove the duplicate row.')
       return
     }
     if (!canReview) return
@@ -491,10 +491,12 @@ export default function CottonLotForm() {
             </thead>
             <tbody>
               {rows.map((row) => {
-                const takenFarmerIds = new Set(
-                  rows.filter((r) => r.key !== row.key).map((r) => r.farmerId).filter(Boolean)
+                const takenKeys = new Set(
+                  rows.filter((r) => r.key !== row.key)
+                      .map((r) => r.farmerId && r.price ? `${r.farmerId}::${r.price}` : '')
+                      .filter(Boolean)
                 )
-                const isDuplicate = Boolean(row.farmerId && takenFarmerIds.has(row.farmerId))
+                const isDuplicate = Boolean(row.farmerId && row.price && takenKeys.has(`${row.farmerId}::${row.price}`))
                 return (
                   <EntryRow
                     key={row.key}

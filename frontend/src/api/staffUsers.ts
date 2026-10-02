@@ -53,3 +53,10 @@ export function useUpdateStaffUser() {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 }
+
+export function useChangeMyPassword() {
+  return useMutation({
+    mutationFn: async (newPassword: string) =>
+      api.put('/api/staff-users/me/password', { newPassword }),
+  })
+}

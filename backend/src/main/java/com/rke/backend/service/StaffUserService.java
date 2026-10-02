@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.rke.backend.domain.StaffUser;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.StaffRole;
+import com.rke.backend.dto.ChangeMyPasswordRequest;
 import com.rke.backend.dto.StaffUserCreateRequest;
 import com.rke.backend.dto.StaffUserResponse;
 import com.rke.backend.dto.StaffUserUpdateRequest;
@@ -129,6 +130,26 @@ public class StaffUserService {
         auditService.record("staff_users", user.getId(), AuditAction.UPDATE,
                 before, auditSnapshot(user));
         return StaffUserResponse.from(user);
+    }
+
+    /**
+     * Allows any authenticated user (ADMIN, STAFF, SUPER_ADMIN) to change their
+     * own password. No role check needed — you are always allowed to change your
+     * own password. The caller's identity is taken from the security context,
+     * never from the request body.
+     */
+    @Transactional
+    public void changeMyPassword(ChangeMyPasswordRequest request) {
+        UUID myId = currentUserService.getCurrentUserId();
+        StaffUser me = repository.findById(myId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        Map<String, Object> before = auditSnapshot(me);
+        me.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        repository.save(me);
+
+        auditService.record("staff_users", me.getId(), AuditAction.UPDATE,
+                before, auditSnapshot(me));
     }
 
     private StaffUser require(UUID id) {
