@@ -2,10 +2,18 @@ import { useState } from 'react'
 import { useVillages } from '../../api/villages'
 import { useFarmerOutstandings, type DateRangeFilter } from '../../api/reports'
 import ReportShell from '../../components/ReportShell'
-import { formatBalance } from '../../lib/balance'
 import { printReport, esc } from '../../lib/printReport'
 
 type Filter = DateRangeFilter & { villageId?: string }
+
+function fmt(n: number) {
+  return '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtSigned(n: number) {
+  const sign = n < 0 ? '-' : n > 0 ? '+' : ''
+  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 export default function VillageOutstandingsPage() {
   const today = new Date().toISOString().slice(0, 10)
@@ -25,31 +33,44 @@ export default function VillageOutstandingsPage() {
 
   const run = () => setActive({ ...draft })
 
-  const grandTotal = data.reduce((s, r) => s + r.outstandingBalance, 0)
-  const { label: totalLabel, direction: totalDir } = formatBalance(grandTotal)
+  const totalDebits    = data.reduce((s, r) => s + r.totalDebits, 0)
+  const totalCredits   = data.reduce((s, r) => s + r.totalCredits, 0)
+  const totalInterest  = data.reduce((s, r) => s + r.totalInterest, 0)
+  const grandBalance   = data.reduce((s, r) => s + r.outstandingBalance, 0)
 
   const handlePrint = () => {
     const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
     const rows = data.map(r => {
-      const { label, direction } = formatBalance(r.outstandingBalance)
-      const cls = direction === 'owes' ? 'debit' : direction === 'credit' ? 'credit' : 'muted'
+      const bal = r.outstandingBalance
+      const balCls = bal > 0 ? 'credit' : bal < 0 ? 'debit' : 'muted'
+      const remarks = bal > 0 ? 'Firm owes' : bal < 0 ? 'Farmer owes' : '—'
       return `<tr>
         <td>${esc(r.farmerName)}</td>
-        <td>${esc(r.fatherName)}</td>
-        <td>${esc(r.villageName)}</td>
-        <td class="right ${cls}">${label}</td>
+        <td>${esc(r.fatherName ?? '—')}</td>
+        <td>${esc(r.villageName ?? '—')}</td>
+        <td class="right">${fmt(r.totalDebits)}</td>
+        <td class="right">${fmt(r.totalCredits)}</td>
+        <td class="right">${fmt(r.totalInterest)}</td>
+        <td class="right ${balCls}">${fmtSigned(bal)}</td>
+        <td>${remarks}</td>
       </tr>`
     }).join('')
-    const { label: totLabel, direction: totDir } = formatBalance(grandTotal)
-    const totCls = totDir === 'owes' ? 'debit' : totDir === 'credit' ? 'credit' : 'muted'
+
+    const totBalCls = grandBalance > 0 ? 'credit' : grandBalance < 0 ? 'debit' : 'muted'
     const table = `<table>
       <thead><tr>
-        <th>Farmer</th><th>Father Name</th><th>Village</th><th class="right">Outstanding Balance</th>
+        <th>Farmer</th><th>Father Name</th><th>Village</th>
+        <th class="right">Debit</th><th class="right">Credit</th><th class="right">Interest</th>
+        <th class="right">Outstanding Balance</th><th>Remarks</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
-        <td colspan="3" class="right">Total Outstanding</td>
-        <td class="right ${totCls}">${totLabel}</td>
+        <td colspan="3" class="right">Total</td>
+        <td class="right">${fmt(totalDebits)}</td>
+        <td class="right">${fmt(totalCredits)}</td>
+        <td class="right">${fmt(totalInterest)}</td>
+        <td class="right ${totBalCls}">${fmtSigned(grandBalance)}</td>
+        <td></td>
       </tr></tfoot>
     </table>`
     printReport('Village Outstandings', `Period: ${dateRange || 'All dates'}`, table, `Village Outstandings${dateRange ? ' - ' + dateRange : ''}`)
@@ -99,40 +120,53 @@ export default function VillageOutstandingsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Farmer', 'Father Name', 'Village', 'Outstanding Balance'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                {['Farmer', 'Father Name', 'Village', 'Debit', 'Credit', 'Interest', 'Outstanding Balance', 'Remarks'].map((h) => (
+                  <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 ${
+                    ['Debit', 'Credit', 'Interest', 'Outstanding Balance'].includes(h) ? 'text-right' : 'text-left'
+                  }`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.map((row) => {
-                const { label, direction } = formatBalance(row.outstandingBalance)
+                const bal = row.outstandingBalance
+                const remarks = bal > 0 ? 'Firm owes' : bal < 0 ? 'Farmer owes' : '—'
                 return (
                   <tr key={row.farmerId} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{row.farmerName}</td>
                     <td className="px-4 py-2.5 text-slate-500">{row.fatherName || '—'}</td>
                     <td className="px-4 py-2.5 text-slate-600">{row.villageName || '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalDebits)}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalCredits)}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalInterest)}</td>
                     <td className={`px-4 py-2.5 text-right font-semibold ${
-                      direction === 'owes' ? 'text-red-600' :
-                      direction === 'credit' ? 'text-green-600' : 'text-slate-400'
+                      bal > 0 ? 'text-green-600' : bal < 0 ? 'text-red-600' : 'text-slate-400'
                     }`}>
-                      {label}
+                      {fmtSigned(bal)}
+                    </td>
+                    <td className={`px-4 py-2.5 text-sm ${
+                      bal > 0 ? 'text-green-700' : bal < 0 ? 'text-red-700' : 'text-slate-400'
+                    }`}>
+                      {remarks}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
-            <tfoot className="bg-slate-50">
+            <tfoot className="bg-slate-50 border-t border-slate-200">
               <tr>
                 <td colSpan={3} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Total Outstanding
+                  Total
                 </td>
+                <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalDebits)}</td>
+                <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalCredits)}</td>
+                <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalInterest)}</td>
                 <td className={`px-4 py-3 text-right font-bold text-base ${
-                  totalDir === 'owes' ? 'text-red-700' :
-                  totalDir === 'credit' ? 'text-green-700' : 'text-slate-500'
+                  grandBalance > 0 ? 'text-green-700' : grandBalance < 0 ? 'text-red-700' : 'text-slate-500'
                 }`}>
-                  {totalLabel}
+                  {fmtSigned(grandBalance)}
                 </td>
+                <td />
               </tr>
             </tfoot>
           </table>

@@ -64,20 +64,19 @@ logging:
 # ----------------------------------------------------------------------------
 management:
   tracing:
-    # Sample 100 % of requests in dev/test.  Override to a lower value
-    # (e.g. 0.1) in production to reduce export volume.
+    # Disable all tracing when no OTLP endpoint is configured.
+    # Set OTEL_TRACING_ENABLED=true and OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    # to re-enable. When enabled, 100% of requests are sampled in dev.
+    enabled: ${OTEL_TRACING_ENABLED:false}
     sampling:
       probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
-    # Propagate W3C TraceContext + Baggage headers (interoperable with all
-    # modern OTEL-aware services and the OTEL Collector).
     propagation:
       type: W3C
   otlp:
     tracing:
-      # OTLP/gRPC endpoint for the span exporter.
-      # Leave blank to disable export (spans are still created locally).
-      # In Docker Compose this is set to http://otel-collector:4317.
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+      # Only used when tracing is enabled (management.tracing.enabled=true).
+      # Must be a valid http:// or https:// URL when tracing is active.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4317}
   # Expose the health and tracing actuator endpoints.
   endpoints:
     web:

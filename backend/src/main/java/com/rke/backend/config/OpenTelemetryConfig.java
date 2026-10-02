@@ -59,7 +59,7 @@ public class OpenTelemetryConfig {
 
     private static final Logger log = LoggerFactory.getLogger(OpenTelemetryConfig.class);
 
-    @Value("${management.otlp.tracing.endpoint:}")
+    @Value("${management.otlp.tracing.endpoint:#{null}}")
     private String otlpEndpoint;
 
     @Value("${otel.service.name:rke-backend}")

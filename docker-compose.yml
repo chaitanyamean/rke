@@ -109,12 +109,16 @@ services:
       SPRING_PROFILES_ACTIVE: dev
 
       # ---- OpenTelemetry ----
-      # Endpoint read by OpenTelemetryConfig (management.otlp.tracing.endpoint).
-      # Traces go to the OTEL Collector, which fans out to Jaeger and debug.
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      # Set OTEL_EXPORTER_OTLP_ENDPOINT to enable export (e.g. http://otel-collector:4317).
+      # When this env var is absent, Spring Boot's OTLP auto-configuration is skipped
+      # entirely — no exporter is created, no connection attempts are made.
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: rke-backend
       DEPLOYMENT_ENVIRONMENT: development
       OTEL_SAMPLING_PROBABILITY: "1.0"
+      # Disable the Java agent baked into the Docker image (set in Dockerfile's JAVA_TOOL_OPTIONS).
+      # Remove this line to re-enable the agent alongside the OTLP exporter.
+      JAVA_TOOL_OPTIONS: ""
 
       # ---- S3 storage (logo uploads) — override via .env ----
       S3_ENDPOINT: ${S3_ENDPOINT:-}

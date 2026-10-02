@@ -235,15 +235,26 @@ public class ReportService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 2b. Farmer outstandings — per-farmer outstanding balance with date filter
+    // 2b. Farmer outstandings — per-farmer DEBIT / CREDIT / INTEREST breakdown
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Returns each farmer's outstanding balance for the given date range,
-     * using the same {@link TransactionClassifier} sign convention as
-     * {@link com.rke.backend.service.PaymentService#getOutstandingBalance}.
+     * Returns each farmer's outstanding breakdown for the given date range.
+     *
+     * <p>Columns match the Farmer Ledger totals for the same period:
+     * <ul>
+     *   <li>{@code totalDebits}  – SUM of all DEBIT-classified transactions
+     *       (CASH_SALE, CREDIT_SALE, CASH_PAYMENT)</li>
+     *   <li>{@code totalCredits} – SUM of all CREDIT-classified transactions
+     *       (CASH_RECEIPT, RETURN, COTTON_PROCUREMENT)</li>
+     *   <li>{@code totalInterest} – reserved, always 0 until interest formula
+     *       is confirmed by the client</li>
+     *   <li>{@code outstandingBalance} = totalCredits − totalDebits − totalInterest
+     *       (positive → firm owes farmer; negative → farmer owes firm)</li>
+     * </ul>
+     *
      * Only active (non-voided) transactions are included.
-     * Optionally filtered by village.
+     * Optionally filtered by village and/or date range.
      */
     @Transactional(readOnly = true)
     public List<FarmerOutstandingRow> farmerOutstandings(UUID villageId,
@@ -251,7 +262,38 @@ public class ReportService {
                                                           LocalDate toDate) {
         UUID tenantId = currentUserService.getTenantId();
 
-        String contributionCase = buildLedgerContributionCase();
+        // Build per-type CASE expressions for debit and credit aggregation,
+        // consistent with TransactionClassifier so the sums match the Farmer Ledger.
+        StringBuilder debitCase  = new StringBuilder("CASE ");
+        StringBuilder creditCase = new StringBuilder("CASE ");
+        for (TransactionType type : TransactionType.values()) {
+            String token = type.name().toLowerCase();
+            if (TransactionClassifier.isDebit(type)) {
+                debitCase.append(String.format(
+                        "WHEN t.transaction_type = '%s' THEN ABS(t.grand_total) ", token));
+            } else {
+                creditCase.append(String.format(
+                        "WHEN t.transaction_type = '%s' THEN ABS(t.grand_total) ", token));
+            }
+        }
+        debitCase.append("ELSE 0 END");
+        creditCase.append("ELSE 0 END");
+
+        String dc = debitCase.toString();
+        String cc = creditCase.toString();
+
+        // Cotton procurement entries live in cotton_lot_entries (not transactions),
+        // and are always credits — computed as a correlated subquery.
+        String cottonCreditSub =
+                "(\n" +
+                "    SELECT COALESCE(SUM(cle.quantity * cle.price), 0)\n" +
+                "    FROM cotton_lot_entries cle\n" +
+                "    JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "    WHERE cle.farmer_id = f.id\n" +
+                "      AND cle.tenant_id = :tenantId\n" +
+                (fromDate != null ? "      AND cl.lot_date >= :fromDate\n" : "") +
+                (toDate   != null ? "      AND cl.lot_date <= :toDate\n"   : "") +
+                ")";
 
         StringBuilder sql = new StringBuilder(
                 "SELECT\n" +
@@ -259,16 +301,12 @@ public class ReportService {
                 "    f.name,\n" +
                 "    f.father_name,\n" +
                 "    v.name AS village_name,\n" +
-                "    COALESCE(SUM(" + contributionCase + "), 0)\n" +
-                "    + COALESCE((\n" +
-                "        SELECT SUM(cle.quantity * cle.price)\n" +
-                "        FROM cotton_lot_entries cle\n" +
-                "        JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
-                "        WHERE cle.farmer_id = f.id\n" +
-                "          AND cle.tenant_id = :tenantId\n" +
-                (fromDate != null ? "          AND cl.lot_date >= :fromDate\n" : "") +
-                (toDate   != null ? "          AND cl.lot_date <= :toDate\n"   : "") +
-                "    ), 0) AS outstanding_balance\n" +
+                // totalDebits: sum of DEBIT transaction types (always positive magnitude)
+                "    COALESCE(SUM(" + dc + "), 0) AS total_debits,\n" +
+                // totalCredits: sum of CREDIT transaction types + cotton procurement
+                "    COALESCE(SUM(" + cc + "), 0) + " + cottonCreditSub + " AS total_credits,\n" +
+                // totalInterest: reserved for future use
+                "    0 AS total_interest\n" +
                 "FROM farmers f\n" +
                 "LEFT JOIN villages v ON v.id = f.village_id\n" +
                 "LEFT JOIN transactions t\n" +
@@ -277,7 +315,7 @@ public class ReportService {
                 "      AND t.status    = 'active'\n");
 
         if (fromDate != null) sql.append("      AND t.transaction_date >= :fromDate\n");
-        if (toDate != null)   sql.append("      AND t.transaction_date <= :toDate\n");
+        if (toDate   != null) sql.append("      AND t.transaction_date <= :toDate\n");
 
         sql.append("WHERE f.tenant_id = :tenantId\n");
         if (villageId != null) sql.append("  AND f.village_id = :villageId\n");
@@ -288,19 +326,28 @@ public class ReportService {
         Query query = entityManager.createNativeQuery(sql.toString());
         query.setParameter("tenantId", tenantId);
         if (fromDate != null)  query.setParameter("fromDate", fromDate);
-        if (toDate != null)    query.setParameter("toDate", toDate);
+        if (toDate   != null)  query.setParameter("toDate", toDate);
         if (villageId != null) query.setParameter("villageId", villageId);
 
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
 
-        return rows.stream().map(r -> new FarmerOutstandingRow(
-                str(r[0]),    // farmerId
-                str(r[1]),    // farmerName
-                str(r[2]),    // fatherName
-                str(r[3]),    // villageName
-                decimal(r[4]) // outstandingBalance
-        )).toList();
+        return rows.stream().map(r -> {
+            BigDecimal debits   = decimal(r[4]);
+            BigDecimal credits  = decimal(r[5]);
+            BigDecimal interest = decimal(r[6]);
+            BigDecimal balance  = credits.subtract(debits).subtract(interest);
+            return new FarmerOutstandingRow(
+                    str(r[0]),   // farmerId
+                    str(r[1]),   // farmerName
+                    str(r[2]),   // fatherName
+                    str(r[3]),   // villageName
+                    debits,
+                    credits,
+                    interest,
+                    balance
+            );
+        }).toList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

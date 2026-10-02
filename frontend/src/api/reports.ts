@@ -44,6 +44,13 @@ export interface FarmerOutstandingRow {
   farmerName: string
   fatherName: string | null
   villageName: string | null
+  /** Sum of all DEBIT-classified transactions (always ≥ 0) */
+  totalDebits: number
+  /** Sum of all CREDIT-classified transactions incl. cotton procurement (always ≥ 0) */
+  totalCredits: number
+  /** Reserved for future interest — always 0 for now */
+  totalInterest: number
+  /** totalCredits − totalDebits − totalInterest; positive = firm owes farmer, negative = farmer owes firm */
   outstandingBalance: number
 }
 
