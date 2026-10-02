@@ -132,6 +132,15 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
     ports:
       - "8000:8080"
+    labels:
+      # Traefik reverse-proxy labels — only active when Traefik is running (production).
+      # In local dev these labels are harmless (no Traefik present).
+      - traefik.enable=true
+      - "traefik.http.routers.rke-backend.rule=Host(`${TRAEFIK_HOST:-localhost}`) && PathPrefix(`/api`)"
+      - traefik.http.routers.rke-backend.entrypoints=websecure
+      - traefik.http.routers.rke-backend.tls.certresolver=letsencrypt
+      - traefik.http.services.rke-backend.loadbalancer.server.port=8080
+      - traefik.http.routers.rke-backend.priority=100
 
   # ---------------------------------------------------------------------------
   # RKE React frontend
@@ -140,7 +149,10 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: http://localhost:8000
+        # In local dev: defaults to localhost. In production: set VITE_API_BASE_URL
+        # in the .env file (e.g. https://srv1809153.hstgr.cloud) so the frontend
+        # build bakes in the correct API URL.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     container_name: rke-frontend
     depends_on:
       - backend
