@@ -104,7 +104,7 @@ export default function VillageOutstandingsPage() {
   )
 
   return (
-    <ReportShell title="Village Outstandings" filters={filters} onRun={run}
+    <ReportShell title="Village Outstanding" filters={filters} onRun={run}
       isLoading={isLoading} ran={true}
       actions={data.length > 0 ? (
         <button onClick={handlePrint}
