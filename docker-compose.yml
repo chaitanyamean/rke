@@ -158,6 +158,14 @@ services:
       - backend
     ports:
       - "3001:80"
+    labels:
+      # Traefik: serve the frontend for all requests that are NOT /api
+      - traefik.enable=true
+      - "traefik.http.routers.rke-frontend.rule=Host(`${TRAEFIK_HOST:-localhost}`)"
+      - traefik.http.routers.rke-frontend.entrypoints=websecure
+      - traefik.http.routers.rke-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.rke-frontend.loadbalancer.server.port=80
+      - traefik.http.routers.rke-frontend.priority=1
 
 volumes:
   postgres_data:
