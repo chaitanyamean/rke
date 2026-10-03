@@ -30,5 +30,7 @@ public record TransactionReportRow(
         // transaction-level amounts
         BigDecimal debitAmount,
         BigDecimal creditAmount,
-        String remarks) {
+        String remarks,
+        // non-null only for cotton_procurement rows — the cotton_lots.id (used for edit link)
+        String cottonLotId) {
 }

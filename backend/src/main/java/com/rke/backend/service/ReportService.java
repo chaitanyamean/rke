@@ -460,7 +460,8 @@ public class ReportService {
                 "    ti.price,\n" +
                 "    CASE WHEN (" + cc + ") < 0 THEN ABS(t.grand_total) ELSE 0 END AS debit_amount,\n" +
                 "    CASE WHEN (" + cc + ") > 0 THEN ABS(t.grand_total) ELSE 0 END AS credit_amount,\n" +
-                "    t.remarks\n" +
+                "    t.remarks,\n" +
+                "    NULL                     AS cotton_lot_id\n" +
                 "FROM transactions t\n" +
                 "JOIN farmers f ON f.id = t.farmer_id AND f.tenant_id = :tenantId\n" +
                 "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id AND ti.tenant_id = :tenantId\n" +
@@ -491,7 +492,8 @@ public class ReportService {
                 "    cle.price,\n" +
                 "    0                        AS debit_amount,\n" +
                 "    (cle.quantity * cle.price) AS credit_amount,\n" +
-                "    NULL                     AS remarks\n" +
+                "    NULL                     AS remarks,\n" +
+                "    cl.id::text              AS cotton_lot_id\n" +
                 "FROM cotton_lot_entries cle\n" +
                 "JOIN cotton_lots cl  ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
                 "JOIN farmers f2      ON f2.id = cle.farmer_id AND f2.tenant_id = :tenantId\n" +
@@ -534,7 +536,8 @@ public class ReportService {
                     decimal(r[9]),   // price
                     decimal(r[10]),  // debitAmount
                     decimal(r[11]),  // creditAmount
-                    str(r[12])       // remarks
+                    str(r[12]),      // remarks
+                    str(r[13])       // cottonLotId (null for non-cotton rows)
             );
         }).toList();
     }

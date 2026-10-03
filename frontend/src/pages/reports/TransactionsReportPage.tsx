@@ -5,15 +5,15 @@ import { useAuth } from '../../auth/AuthContext'
 import ReportShell from '../../components/ReportShell'
 import { printReport, esc } from '../../lib/printReport'
 
-function editPathFor(transactionType: string, transactionId: string): string | null {
-  switch (transactionType) {
-    case 'cash_sale':    return `/sales/cash/${transactionId}/edit`
-    case 'credit_sale':  return `/sales/credit/${transactionId}/edit`
-    case 'cash_payment': return `/payments/payment/${transactionId}/edit`
-    case 'cash_receipt': return `/payments/receipt/${transactionId}/edit`
-    case 'return':       return `/returns/${transactionId}/edit`
-    case 'cotton_procurement': return null  // edit via cotton lot page — no direct entry edit
-    default:             return null
+function editPathFor(row: TransactionReportRow): string | null {
+  switch (row.transactionType) {
+    case 'cash_sale':          return `/sales/cash/${row.transactionId}/edit`
+    case 'credit_sale':        return `/sales/credit/${row.transactionId}/edit`
+    case 'cash_payment':       return `/payments/payment/${row.transactionId}/edit`
+    case 'cash_receipt':       return `/payments/receipt/${row.transactionId}/edit`
+    case 'return':             return `/returns/${row.transactionId}/edit`
+    case 'cotton_procurement': return row.cottonLotId ? `/cotton/${row.cottonLotId}/edit` : null
+    default:                   return null
   }
 }
 
@@ -170,7 +170,7 @@ export default function TransactionsReportPage() {
                 const first = group[0]
                 const rowspan = group.length
                 const isDebit = first.direction === 'DEBIT'
-                const editPath = isAdmin ? editPathFor(first.transactionType, first.transactionId) : null
+                const editPath = isAdmin ? editPathFor(first) : null
 
                 return group.map((row, itemIdx) => {
                   const isFirstRow = itemIdx === 0

@@ -37,6 +37,8 @@ export interface TransactionReportRow {
   debitAmount: number
   creditAmount: number
   remarks: string | null
+  /** Non-null only for cotton_procurement rows — the cotton_lots.id (used for edit link) */
+  cottonLotId: string | null
 }
 
 export interface FarmerOutstandingRow {
