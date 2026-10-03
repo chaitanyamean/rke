@@ -10,11 +10,6 @@ function fmt(n: number) {
   return '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function fmtSigned(n: number) {
-  const sign = n < 0 ? '-' : n > 0 ? '+' : ''
-  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 export default function VillageOutstandingsPage() {
   const today = new Date().toISOString().slice(0, 10)
   const [draft, setDraft] = useState<Filter>({
@@ -33,17 +28,21 @@ export default function VillageOutstandingsPage() {
 
   const run = () => setActive({ ...draft })
 
-  const totalDebits    = data.reduce((s, r) => s + r.totalDebits, 0)
-  const totalCredits   = data.reduce((s, r) => s + r.totalCredits, 0)
-  const totalInterest  = data.reduce((s, r) => s + r.totalInterest, 0)
-  const grandBalance   = data.reduce((s, r) => s + r.outstandingBalance, 0)
+  const totalDebits   = data.reduce((s, r) => s + r.totalDebits, 0)
+  const totalCredits  = data.reduce((s, r) => s + r.totalCredits, 0)
+  const totalInterest = data.reduce((s, r) => s + r.totalInterest, 0)
+
+  // Farmer owes = rows where balance < 0 (absolute value)
+  // Firm owes   = rows where balance > 0
+  const totalFarmerOwes = data.reduce((s, r) => r.outstandingBalance < 0 ? s + Math.abs(r.outstandingBalance) : s, 0)
+  const totalFirmOwes   = data.reduce((s, r) => r.outstandingBalance > 0 ? s + r.outstandingBalance : s, 0)
 
   const handlePrint = () => {
     const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
     const rows = data.map(r => {
       const bal = r.outstandingBalance
-      const balCls = bal > 0 ? 'credit' : bal < 0 ? 'debit' : 'muted'
-      const remarks = bal > 0 ? 'Firm owes' : bal < 0 ? 'Farmer owes' : '—'
+      const farmerOwes = bal < 0 ? fmt(Math.abs(bal)) : '—'
+      const firmOwes   = bal > 0 ? fmt(bal) : '—'
       return `<tr>
         <td>${esc(r.farmerName)}</td>
         <td>${esc(r.fatherName ?? '—')}</td>
@@ -51,17 +50,16 @@ export default function VillageOutstandingsPage() {
         <td class="right">${fmt(r.totalDebits)}</td>
         <td class="right">${fmt(r.totalCredits)}</td>
         <td class="right">${fmt(r.totalInterest)}</td>
-        <td class="right ${balCls}">${fmtSigned(bal)}</td>
-        <td>${remarks}</td>
+        <td class="right debit">${farmerOwes}</td>
+        <td class="right credit">${firmOwes}</td>
       </tr>`
     }).join('')
 
-    const totBalCls = grandBalance > 0 ? 'credit' : grandBalance < 0 ? 'debit' : 'muted'
     const table = `<table>
       <thead><tr>
         <th>Farmer</th><th>Father Name</th><th>Village</th>
         <th class="right">Debit</th><th class="right">Credit</th><th class="right">Interest</th>
-        <th class="right">Outstanding Balance</th><th>Remarks</th>
+        <th class="right">Farmer Owes</th><th class="right">Firm Owes</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
@@ -69,8 +67,8 @@ export default function VillageOutstandingsPage() {
         <td class="right">${fmt(totalDebits)}</td>
         <td class="right">${fmt(totalCredits)}</td>
         <td class="right">${fmt(totalInterest)}</td>
-        <td class="right ${totBalCls}">${fmtSigned(grandBalance)}</td>
-        <td></td>
+        <td class="right debit">${fmt(totalFarmerOwes)}</td>
+        <td class="right credit">${fmt(totalFirmOwes)}</td>
       </tr></tfoot>
     </table>`
     printReport('Village Outstandings', `Period: ${dateRange || 'All dates'}`, table, `Village Outstandings${dateRange ? ' - ' + dateRange : ''}`)
@@ -104,7 +102,7 @@ export default function VillageOutstandingsPage() {
   )
 
   return (
-    <ReportShell title="Village Outstanding" filters={filters} onRun={run}
+    <ReportShell title="Village Outstandings" filters={filters} onRun={run}
       isLoading={isLoading} ran={true}
       actions={data.length > 0 ? (
         <button onClick={handlePrint}
@@ -120,17 +118,25 @@ export default function VillageOutstandingsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                {['Farmer', 'Father Name', 'Village', 'Debit', 'Credit', 'Interest', 'Outstanding Balance', 'Remarks'].map((h) => (
-                  <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 ${
-                    ['Debit', 'Credit', 'Interest', 'Outstanding Balance'].includes(h) ? 'text-right' : 'text-left'
-                  }`}>{h}</th>
+                {[
+                  { label: 'Farmer',       right: false },
+                  { label: 'Father Name',  right: false },
+                  { label: 'Village',      right: false },
+                  { label: 'Debit',        right: true  },
+                  { label: 'Credit',       right: true  },
+                  { label: 'Interest',     right: true  },
+                  { label: 'Farmer Owes',  right: true  },
+                  { label: 'Firm Owes',    right: true  },
+                ].map(({ label, right }) => (
+                  <th key={label} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 ${right ? 'text-right' : 'text-left'}`}>
+                    {label}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.map((row) => {
                 const bal = row.outstandingBalance
-                const remarks = bal > 0 ? 'Firm owes' : bal < 0 ? 'Farmer owes' : '—'
                 return (
                   <tr key={row.farmerId} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{row.farmerName}</td>
@@ -139,21 +145,19 @@ export default function VillageOutstandingsPage() {
                     <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalDebits)}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalCredits)}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalInterest)}</td>
-                    <td className={`px-4 py-2.5 text-right font-semibold ${
-                      bal > 0 ? 'text-green-600' : bal < 0 ? 'text-red-600' : 'text-slate-400'
-                    }`}>
-                      {fmtSigned(bal)}
+                    {/* Farmer Owes — red, shown only when balance is negative */}
+                    <td className={`px-4 py-2.5 text-right font-semibold ${bal < 0 ? 'text-red-600' : 'text-slate-300'}`}>
+                      {bal < 0 ? fmt(Math.abs(bal)) : '—'}
                     </td>
-                    <td className={`px-4 py-2.5 text-sm ${
-                      bal > 0 ? 'text-green-700' : bal < 0 ? 'text-red-700' : 'text-slate-400'
-                    }`}>
-                      {remarks}
+                    {/* Firm Owes — green, shown only when balance is positive */}
+                    <td className={`px-4 py-2.5 text-right font-semibold ${bal > 0 ? 'text-green-600' : 'text-slate-300'}`}>
+                      {bal > 0 ? fmt(bal) : '—'}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
-            <tfoot className="bg-slate-50 border-t border-slate-200">
+            <tfoot className="bg-slate-50 border-t-2 border-slate-300">
               <tr>
                 <td colSpan={3} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Total
@@ -161,12 +165,8 @@ export default function VillageOutstandingsPage() {
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalDebits)}</td>
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalCredits)}</td>
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalInterest)}</td>
-                <td className={`px-4 py-3 text-right font-bold text-base ${
-                  grandBalance > 0 ? 'text-green-700' : grandBalance < 0 ? 'text-red-700' : 'text-slate-500'
-                }`}>
-                  {fmtSigned(grandBalance)}
-                </td>
-                <td />
+                <td className="px-4 py-3 text-right font-bold text-base text-red-700">{fmt(totalFarmerOwes)}</td>
+                <td className="px-4 py-3 text-right font-bold text-base text-green-700">{fmt(totalFirmOwes)}</td>
               </tr>
             </tfoot>
           </table>
