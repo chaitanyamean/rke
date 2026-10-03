@@ -295,6 +295,85 @@ public class ReportService {
                 (toDate   != null ? "      AND cl.lot_date <= :toDate\n"   : "") +
                 ")";
 
+        // Interest correlated subquery — same 24% per annum formula as FarmerLedgerPage.tsx:
+        // For each consecutive pair of transactions (ordered by date, created_at, id):
+        //   if the running balance BEFORE the current transaction is negative (farmer owes),
+        //   interest = |running_balance| * days_between * 24 / 365 / 100
+        // Plus trailing interest from the last transaction to toDate (or today) if balance < 0.
+        String effectiveToDate = toDate != null ? ":toDate" : "CURRENT_DATE";
+        String interestSub =
+                "(\n" +
+                "    WITH tx AS (\n" +
+                "        SELECT\n" +
+                "            transaction_date,\n" +
+                "            created_at,\n" +
+                "            id,\n" +
+                "            " + buildLedgerContributionCase() + " AS signed_amount\n" +
+                "        FROM transactions\n" +
+                "        WHERE farmer_id  = f.id\n" +
+                "          AND tenant_id  = :tenantId\n" +
+                "          AND status     = 'active'\n" +
+                (fromDate != null ? "          AND transaction_date >= :fromDate\n" : "") +
+                (toDate   != null ? "          AND transaction_date <= :toDate\n"   : "") +
+                "    ),\n" +
+                "    cotton AS (\n" +
+                "        SELECT\n" +
+                "            cl.lot_date         AS transaction_date,\n" +
+                "            cl.created_at,\n" +
+                "            cle.id,\n" +
+                "            (cle.quantity * cle.price) AS signed_amount\n" +
+                "        FROM cotton_lot_entries cle\n" +
+                "        JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "        WHERE cle.farmer_id = f.id\n" +
+                "          AND cle.tenant_id = :tenantId\n" +
+                (fromDate != null ? "          AND cl.lot_date >= :fromDate\n" : "") +
+                (toDate   != null ? "          AND cl.lot_date <= :toDate\n"   : "") +
+                "    ),\n" +
+                "    all_tx AS (\n" +
+                "        SELECT transaction_date, created_at, id, signed_amount FROM tx\n" +
+                "        UNION ALL\n" +
+                "        SELECT transaction_date, created_at, id, signed_amount FROM cotton\n" +
+                "    ),\n" +
+                "    running AS (\n" +
+                "        SELECT\n" +
+                "            transaction_date,\n" +
+                "            SUM(signed_amount) OVER (\n" +
+                "                ORDER BY transaction_date, created_at, id\n" +
+                "                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n" +
+                "            ) AS running_balance,\n" +
+                "            LEAD(transaction_date) OVER (\n" +
+                "                ORDER BY transaction_date, created_at, id\n" +
+                "            ) AS next_date,\n" +
+                "            ROW_NUMBER() OVER (\n" +
+                "                ORDER BY transaction_date, created_at, id\n" +
+                "            ) AS rn,\n" +
+                "            COUNT(*) OVER () AS total_rows\n" +
+                "        FROM all_tx\n" +
+                "    ),\n" +
+                "    interest_rows AS (\n" +
+                "        -- Interest between consecutive transactions\n" +
+                "        SELECT\n" +
+                "            CASE WHEN running_balance < 0\n" +
+                "                 THEN ABS(running_balance)\n" +
+                "                      * GREATEST(0, EXTRACT(EPOCH FROM (next_date - transaction_date)) / 86400)\n" +
+                "                      * 24.0 / 365.0 / 100.0\n" +
+                "                 ELSE 0 END AS interest_amt\n" +
+                "        FROM running\n" +
+                "        WHERE next_date IS NOT NULL\n" +
+                "        UNION ALL\n" +
+                "        -- Trailing interest: from last transaction to toDate/today\n" +
+                "        SELECT\n" +
+                "            CASE WHEN running_balance < 0\n" +
+                "                 THEN ABS(running_balance)\n" +
+                "                      * GREATEST(0, EXTRACT(EPOCH FROM (" + effectiveToDate + "::date - transaction_date)) / 86400)\n" +
+                "                      * 24.0 / 365.0 / 100.0\n" +
+                "                 ELSE 0 END AS interest_amt\n" +
+                "        FROM running\n" +
+                "        WHERE rn = total_rows\n" +
+                "    )\n" +
+                "    SELECT COALESCE(SUM(interest_amt), 0) FROM interest_rows\n" +
+                ")";
+
         StringBuilder sql = new StringBuilder(
                 "SELECT\n" +
                 "    f.id::text,\n" +
@@ -305,8 +384,8 @@ public class ReportService {
                 "    COALESCE(SUM(" + dc + "), 0) AS total_debits,\n" +
                 // totalCredits: sum of CREDIT transaction types + cotton procurement
                 "    COALESCE(SUM(" + cc + "), 0) + " + cottonCreditSub + " AS total_credits,\n" +
-                // totalInterest: reserved for future use
-                "    0 AS total_interest\n" +
+                // totalInterest: 24% per annum on negative running balance between transactions
+                "    " + interestSub + " AS total_interest\n" +
                 "FROM farmers f\n" +
                 "LEFT JOIN villages v ON v.id = f.village_id\n" +
                 "LEFT JOIN transactions t\n" +
