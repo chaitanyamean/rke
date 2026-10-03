@@ -41,8 +41,7 @@ export default function VillageOutstandingsPage() {
     const dateRange = [active?.fromDate, active?.toDate].filter(Boolean).join(' to ')
     const rows = data.map(r => {
       const bal = r.outstandingBalance
-      const farmerOwes = bal < 0 ? fmt(Math.abs(bal)) : '—'
-      const firmOwes   = bal > 0 ? fmt(bal) : '—'
+      const firmOwes = bal > 0 ? fmt(bal) : '—'
       return `<tr>
         <td>${esc(r.farmerName)}</td>
         <td>${esc(r.fatherName ?? '—')}</td>
@@ -50,7 +49,7 @@ export default function VillageOutstandingsPage() {
         <td class="right">${fmt(r.totalDebits)}</td>
         <td class="right">${fmt(r.totalCredits)}</td>
         <td class="right">${fmt(r.totalInterest)}</td>
-        <td class="right debit">${farmerOwes}</td>
+        <td class="right debit">${bal < 0 ? '-' + fmt(Math.abs(bal)) : '—'}</td>
         <td class="right credit">${firmOwes}</td>
       </tr>`
     }).join('')
@@ -67,7 +66,7 @@ export default function VillageOutstandingsPage() {
         <td class="right">${fmt(totalDebits)}</td>
         <td class="right">${fmt(totalCredits)}</td>
         <td class="right">${fmt(totalInterest)}</td>
-        <td class="right debit">${fmt(totalFarmerOwes)}</td>
+        <td class="right debit">-${fmt(totalFarmerOwes)}</td>
         <td class="right credit">${fmt(totalFirmOwes)}</td>
       </tr></tfoot>
     </table>`
@@ -147,7 +146,7 @@ export default function VillageOutstandingsPage() {
                     <td className="px-4 py-2.5 text-right text-slate-700">{fmt(row.totalInterest)}</td>
                     {/* Farmer Owes — red, shown only when balance is negative */}
                     <td className={`px-4 py-2.5 text-right font-semibold ${bal < 0 ? 'text-red-600' : 'text-slate-300'}`}>
-                      {bal < 0 ? fmt(Math.abs(bal)) : '—'}
+                      {bal < 0 ? '-' + fmt(Math.abs(bal)) : '—'}
                     </td>
                     {/* Firm Owes — green, shown only when balance is positive */}
                     <td className={`px-4 py-2.5 text-right font-semibold ${bal > 0 ? 'text-green-600' : 'text-slate-300'}`}>
@@ -165,7 +164,7 @@ export default function VillageOutstandingsPage() {
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalDebits)}</td>
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalCredits)}</td>
                 <td className="px-4 py-3 text-right font-bold text-slate-700">{fmt(totalInterest)}</td>
-                <td className="px-4 py-3 text-right font-bold text-base text-red-700">{fmt(totalFarmerOwes)}</td>
+                <td className="px-4 py-3 text-right font-bold text-base text-red-700">-{fmt(totalFarmerOwes)}</td>
                 <td className="px-4 py-3 text-right font-bold text-base text-green-700">{fmt(totalFirmOwes)}</td>
               </tr>
             </tfoot>
