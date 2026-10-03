@@ -365,7 +365,7 @@ public class ReportService {
                 "        SELECT\n" +
                 "            CASE WHEN running_balance < 0\n" +
                 "                 THEN ABS(running_balance)\n" +
-                "                      * GREATEST(0, EXTRACT(EPOCH FROM (" + effectiveToDate + "::date - transaction_date)) / 86400)\n" +
+                "                      * GREATEST(0, EXTRACT(EPOCH FROM (CAST(" + effectiveToDate + " AS date) - transaction_date)) / 86400)\n" +
                 "                      * 24.0 / 365.0 / 100.0\n" +
                 "                 ELSE 0 END AS interest_amt\n" +
                 "        FROM running\n" +
