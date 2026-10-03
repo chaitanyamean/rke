@@ -305,16 +305,16 @@ public class ReportService {
                 "(\n" +
                 "    WITH tx AS (\n" +
                 "        SELECT\n" +
-                "            transaction_date,\n" +
-                "            created_at,\n" +
-                "            id,\n" +
-                "            " + buildLedgerContributionCase() + " AS signed_amount\n" +
-                "        FROM transactions\n" +
-                "        WHERE farmer_id  = f.id\n" +
-                "          AND tenant_id  = :tenantId\n" +
-                "          AND status     = 'active'\n" +
-                (fromDate != null ? "          AND transaction_date >= :fromDate\n" : "") +
-                (toDate   != null ? "          AND transaction_date <= :toDate\n"   : "") +
+                "            itx.transaction_date,\n" +
+                "            itx.created_at,\n" +
+                "            itx.id,\n" +
+                "            " + buildLedgerContributionCase("itx") + " AS signed_amount\n" +
+                "        FROM transactions itx\n" +
+                "        WHERE itx.farmer_id = f.id\n" +
+                "          AND itx.tenant_id = :tenantId\n" +
+                "          AND itx.status    = 'active'\n" +
+                (fromDate != null ? "          AND itx.transaction_date >= :fromDate\n" : "") +
+                (toDate   != null ? "          AND itx.transaction_date <= :toDate\n"   : "") +
                 "    ),\n" +
                 "    cotton AS (\n" +
                 "        SELECT\n" +
@@ -791,15 +791,19 @@ public class ReportService {
      * Result: negative for DEBIT types (increases owed), positive for CREDIT types.
      */
     private static String buildLedgerContributionCase() {
+        return buildLedgerContributionCase("t");
+    }
+
+    private static String buildLedgerContributionCase(String alias) {
         StringBuilder sb = new StringBuilder("CASE ");
         for (TransactionType type : TransactionType.values()) {
             String token = type.name().toLowerCase();
             if (TransactionClassifier.isDebit(type)) {
                 sb.append(String.format(
-                    "WHEN t.transaction_type = '%s' THEN -ABS(t.grand_total) ", token));
+                    "WHEN %s.transaction_type = '%s' THEN -ABS(%s.grand_total) ", alias, token, alias));
             } else {
                 sb.append(String.format(
-                    "WHEN t.transaction_type = '%s' THEN ABS(t.grand_total) ", token));
+                    "WHEN %s.transaction_type = '%s' THEN ABS(%s.grand_total) ", alias, token, alias));
             }
         }
         sb.append("ELSE 0 END");
