@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.rke.backend.dto.ChangeMyPasswordRequest;
+import com.rke.backend.dto.StaffUserResponse;
 import com.rke.backend.dto.TenantCreateRequest;
 import com.rke.backend.dto.TenantCreateResponse;
 import com.rke.backend.dto.TenantRequest;
@@ -79,6 +81,26 @@ public class TenantController {
     public TenantResponse uploadLogo(@PathVariable UUID id,
                                       @RequestParam("file") MultipartFile file) {
         return tenantService.uploadLogo(id, file);
+    }
+
+    /**
+     * Lists ADMIN-role users for a given tenant.
+     * Super admin uses this to see who to reset a password for.
+     */
+    @GetMapping("/{id}/admins")
+    public List<StaffUserResponse> listAdmins(@PathVariable UUID id) {
+        return tenantService.listAdmins(id);
+    }
+
+    /**
+     * Resets an ADMIN user's password. Super admin only.
+     */
+    @PutMapping("/{tenantId}/admins/{adminId}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetAdminPassword(@PathVariable UUID tenantId,
+                                    @PathVariable UUID adminId,
+                                    @Valid @RequestBody ChangeMyPasswordRequest request) {
+        tenantService.resetAdminPassword(tenantId, adminId, request);
     }
 
     /**

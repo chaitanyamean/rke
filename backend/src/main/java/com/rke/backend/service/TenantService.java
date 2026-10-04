@@ -17,6 +17,8 @@ import com.rke.backend.domain.Tenant;
 import com.rke.backend.domain.TransactionNoSequence;
 import com.rke.backend.domain.enums.AuditAction;
 import com.rke.backend.domain.enums.StaffRole;
+import com.rke.backend.dto.ChangeMyPasswordRequest;
+import com.rke.backend.dto.StaffUserResponse;
 import com.rke.backend.dto.TenantCreateRequest;
 import com.rke.backend.dto.TenantCreateResponse;
 import com.rke.backend.dto.TenantRequest;
@@ -178,6 +180,44 @@ public class TenantService {
         snapshot.put("role", admin.getRole());
         snapshot.put("active", admin.isActive());
         return snapshot;
+    }
+
+    /**
+     * Lists all ADMIN-role users for a given tenant.
+     * Used by the super admin to see who the admin logins are before resetting a password.
+     */
+    @Transactional(readOnly = true)
+    public List<StaffUserResponse> listAdmins(UUID tenantId) {
+        require(tenantId);
+        return staffUserRepository.findAllByOrderByUsernameAsc().stream()
+                .filter(u -> tenantId.equals(u.getTenantId()) && u.getRole() == StaffRole.ADMIN)
+                .map(StaffUserResponse::from)
+                .toList();
+    }
+
+    /**
+     * Resets the password of an ADMIN user belonging to the given tenant.
+     * Only callable by SUPER_ADMIN (enforced at the controller level).
+     */
+    @Transactional
+    public void resetAdminPassword(UUID tenantId, UUID adminId, ChangeMyPasswordRequest request) {
+        require(tenantId);
+        StaffUser admin = staffUserRepository.findById(adminId)
+                .orElseThrow(() -> NotFoundException.of("Staff user", adminId));
+
+        if (!tenantId.equals(admin.getTenantId())) {
+            throw NotFoundException.of("Staff user", adminId);
+        }
+        if (admin.getRole() != StaffRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only ADMIN-role users can have their password reset here");
+        }
+
+        Map<String, Object> before = adminAuditSnapshot(admin);
+        admin.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        staffUserRepository.save(admin);
+        auditService.recordForTenant(tenantId, "staff_users", admin.getId(),
+                AuditAction.UPDATE, before, adminAuditSnapshot(admin));
     }
 
     @Transactional

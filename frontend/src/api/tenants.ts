@@ -133,3 +133,37 @@ export function useSetTenantFeature() {
       qc.invalidateQueries({ queryKey: [...FEATURES_KEY, vars.tenantId] }),
   })
 }
+
+// ── Admin password reset (super_admin) ───────────────────────────────────────
+
+export interface TenantAdminUser {
+  id: string
+  tenantId: string
+  username: string
+  fullName: string | null
+  active: boolean
+}
+
+export function useTenantAdmins(tenantId: string | null) {
+  return useQuery({
+    queryKey: ['tenant-admins', tenantId],
+    queryFn: async () =>
+      (await api.get<TenantAdminUser[]>(`/api/admin/tenants/${tenantId}/admins`)).data,
+    enabled: Boolean(tenantId),
+  })
+}
+
+export function useResetAdminPassword() {
+  return useMutation({
+    mutationFn: async ({
+      tenantId,
+      adminId,
+      newPassword,
+    }: {
+      tenantId: string
+      adminId: string
+      newPassword: string
+    }) =>
+      api.put(`/api/admin/tenants/${tenantId}/admins/${adminId}/password`, { newPassword }),
+  })
+}
