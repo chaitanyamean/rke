@@ -22,6 +22,7 @@ import com.rke.backend.dto.PaymentUpdateRequest;
 import com.rke.backend.dto.TransactionResponse;
 import com.rke.backend.exception.NotFoundException;
 import com.rke.backend.repository.BillNumberTypeRepository;
+import com.rke.backend.repository.CottonLotEntryRepository;
 import com.rke.backend.repository.FarmerRepository;
 import com.rke.backend.repository.TransactionRepository;
 import com.rke.backend.security.CurrentUserService;
@@ -34,6 +35,7 @@ public class PaymentService {
     private final TransactionRepository transactionRepository;
     private final FarmerRepository farmerRepository;
     private final BillNumberTypeRepository billNumberTypeRepository;
+    private final CottonLotEntryRepository cottonLotEntryRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
     private final EntityManager entityManager;
@@ -41,12 +43,14 @@ public class PaymentService {
     public PaymentService(TransactionRepository transactionRepository,
                           FarmerRepository farmerRepository,
                           BillNumberTypeRepository billNumberTypeRepository,
+                          CottonLotEntryRepository cottonLotEntryRepository,
                           AuditService auditService,
                           CurrentUserService currentUserService,
                           EntityManager entityManager) {
         this.transactionRepository = transactionRepository;
         this.farmerRepository = farmerRepository;
         this.billNumberTypeRepository = billNumberTypeRepository;
+        this.cottonLotEntryRepository = cottonLotEntryRepository;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
         this.entityManager = entityManager;
@@ -185,12 +189,21 @@ public class PaymentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Farmer not found: " + farmerId));
 
+        UUID tenantId = currentUserService.getTenantId();
+
         BigDecimal outstanding = BigDecimal.ZERO;
         for (TransactionType type : TransactionType.values()) {
             BigDecimal total = nvl(transactionRepository.sumGrandTotal(
                     farmerId, type, TransactionStatus.ACTIVE));
             outstanding = outstanding.add(TransactionClassifier.signedAmount(type, total));
         }
+
+        // Cotton procurement entries live in cotton_lot_entries, not transactions.
+        // They are always credits (positive) — add them to the balance.
+        BigDecimal cottonCredit = nvl(
+                cottonLotEntryRepository.sumCottonCreditByFarmer(farmerId, tenantId));
+        outstanding = outstanding.add(cottonCredit);
+
         return outstanding;
     }
 
