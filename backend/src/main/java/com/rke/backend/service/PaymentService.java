@@ -191,6 +191,7 @@ public class PaymentService {
 
         UUID tenantId = currentUserService.getTenantId();
 
+        // Base balance: sum of all transaction types using TransactionClassifier sign convention
         BigDecimal outstanding = BigDecimal.ZERO;
         for (TransactionType type : TransactionType.values()) {
             BigDecimal total = nvl(transactionRepository.sumGrandTotal(
@@ -199,12 +200,104 @@ public class PaymentService {
         }
 
         // Cotton procurement entries live in cotton_lot_entries, not transactions.
-        // They are always credits (positive) — add them to the balance.
+        // They are always credits (positive).
         BigDecimal cottonCredit = nvl(
                 cottonLotEntryRepository.sumCottonCreditByFarmer(farmerId, tenantId));
         outstanding = outstanding.add(cottonCredit);
 
+        // Interest: 24% per annum on negative running balance between transactions,
+        // same formula as FarmerLedgerPage.tsx. Computed via native SQL window function.
+        BigDecimal interest = nvl(computeInterest(farmerId, tenantId));
+        // Interest increases what the farmer owes — subtract from outstanding
+        // (outstanding is negative when farmer owes, so subtracting makes it more negative)
+        outstanding = outstanding.subtract(interest);
+
         return outstanding;
+    }
+
+    /**
+     * Computes total interest using the same 24%/365 formula as the Farmer Ledger page:
+     * for each consecutive pair of transactions (ordered by date), if the running balance
+     * before the next transaction is negative (farmer owes), interest accrues at 24% p.a.
+     * Plus trailing interest from the last transaction date to today.
+     */
+    private BigDecimal computeInterest(UUID farmerId, UUID tenantId) {
+        String contributionCase = buildLedgerContributionCase();
+
+        String sql =
+                "WITH tx AS (\n" +
+                "    SELECT itx.transaction_date, itx.created_at, itx.id,\n" +
+                "           " + contributionCase + " AS signed_amount\n" +
+                "    FROM transactions itx\n" +
+                "    WHERE itx.farmer_id = :farmerId\n" +
+                "      AND itx.tenant_id = :tenantId\n" +
+                "      AND itx.status    = 'active'\n" +
+                "),\n" +
+                "cotton AS (\n" +
+                "    SELECT cl.lot_date AS transaction_date, cl.created_at, cle.id,\n" +
+                "           (cle.quantity * cle.price) AS signed_amount\n" +
+                "    FROM cotton_lot_entries cle\n" +
+                "    JOIN cotton_lots cl ON cl.id = cle.cotton_lot_id AND cl.tenant_id = :tenantId\n" +
+                "    WHERE cle.farmer_id = :farmerId AND cle.tenant_id = :tenantId\n" +
+                "),\n" +
+                "all_tx AS (\n" +
+                "    SELECT transaction_date, created_at, id, signed_amount FROM tx\n" +
+                "    UNION ALL\n" +
+                "    SELECT transaction_date, created_at, id, signed_amount FROM cotton\n" +
+                "),\n" +
+                "running AS (\n" +
+                "    SELECT transaction_date,\n" +
+                "           SUM(signed_amount) OVER (\n" +
+                "               ORDER BY transaction_date, created_at, id\n" +
+                "               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n" +
+                "           ) AS running_balance,\n" +
+                "           LEAD(transaction_date) OVER (\n" +
+                "               ORDER BY transaction_date, created_at, id\n" +
+                "           ) AS next_date,\n" +
+                "           ROW_NUMBER() OVER (\n" +
+                "               ORDER BY transaction_date, created_at, id\n" +
+                "           ) AS rn,\n" +
+                "           COUNT(*) OVER () AS total_rows\n" +
+                "    FROM all_tx\n" +
+                "),\n" +
+                "interest_rows AS (\n" +
+                "    SELECT CASE WHEN running_balance < 0\n" +
+                "                THEN ABS(running_balance)\n" +
+                "                     * GREATEST(0, (next_date - transaction_date))\n" +
+                "                     * 24.0 / 365.0 / 100.0\n" +
+                "                ELSE 0 END AS interest_amt\n" +
+                "    FROM running WHERE next_date IS NOT NULL\n" +
+                "    UNION ALL\n" +
+                "    SELECT CASE WHEN running_balance < 0\n" +
+                "                THEN ABS(running_balance)\n" +
+                "                     * GREATEST(0, (CURRENT_DATE - transaction_date))\n" +
+                "                     * 24.0 / 365.0 / 100.0\n" +
+                "                ELSE 0 END AS interest_amt\n" +
+                "    FROM running WHERE rn = total_rows\n" +
+                ")\n" +
+                "SELECT COALESCE(SUM(interest_amt), 0) FROM interest_rows";
+
+        jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("farmerId", farmerId);
+        query.setParameter("tenantId", tenantId);
+        Object result = query.getSingleResult();
+        return result == null ? BigDecimal.ZERO : new BigDecimal(result.toString());
+    }
+
+    private static String buildLedgerContributionCase() {
+        StringBuilder sb = new StringBuilder("CASE ");
+        for (TransactionType type : TransactionType.values()) {
+            String token = type.name().toLowerCase();
+            if (TransactionClassifier.isDebit(type)) {
+                sb.append(String.format(
+                    "WHEN itx.transaction_type = '%s' THEN -ABS(itx.grand_total) ", token));
+            } else {
+                sb.append(String.format(
+                    "WHEN itx.transaction_type = '%s' THEN ABS(itx.grand_total) ", token));
+            }
+        }
+        sb.append("ELSE 0 END");
+        return sb.toString();
     }
 
     private static BigDecimal nvl(BigDecimal value) {
