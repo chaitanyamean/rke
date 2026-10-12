@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>RKE Backend — Learning Notes</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1e293b;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 48px;
+  background: #fff;
+}
+h1 { font-size: 2em; color: #0f172a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; margin-top: 0; }
+h2 { font-size: 1.4em; color: #1d4ed8; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 40px; }
+h3 { font-size: 1.1em; color: #334155; margin-top: 24px; }
+h4 { font-size: 1em; color: #475569; margin-top: 16px; }
+code {
+  font-family: "SF Mono", "Fira Code", Consolas, "Courier New", monospace;
+  font-size: 0.85em;
+  background: #f1f5f9;
+  color: #be123c;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 16px 20px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.83em;
+  line-height: 1.6;
+  margin: 16px 0;
+}
+pre code { background: none; color: #e2e8f0; padding: 0; font-size: inherit; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 0.9em;
+}
+th {
+  background: #1d4ed8;
+  color: #fff;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+}
+td {
+  padding: 8px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+tr:nth-child(even) td { background: #f8fafc; }
+blockquote {
+  border-left: 4px solid #3b82f6;
+  margin: 16px 0;
+  padding: 8px 16px;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 0 6px 6px 0;
+}
+hr { border: none; border-top: 2px solid #e2e8f0; margin: 32px 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+@media print {
+  body { padding: 20px 24px; font-size: 12px; }
+  pre { page-break-inside: avoid; }
+  h2 { page-break-before: auto; }
+  table { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">RKE Backend — Learning Notes</h1>
+</header>
+<h1 id="rke-backend-learning-notes">RKE Backend — Learning Notes</h1>
+<h3 id="spring-boot-spring-security-multi-tenancy-aop-jpa">Spring Boot ·
+Spring Security · Multi-Tenancy · AOP · JPA</h3>
+<blockquote>
+<p>These notes are based on the RKE backend codebase. Every example is
+taken directly from the actual project files.</p>
+</blockquote>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol type="1">
+<li><a href="#1-java-interfaces">Java Interfaces</a></li>
+<li><a href="#2-how-the-app-connects-to-the-database">How the App
+Connects to the Database</a></li>
+<li><a href="#3-api-design">API Design</a></li>
+<li><a href="#4-spring-security">Spring Security</a></li>
+<li><a href="#5-the-8-step-request-security-flow">The 8-Step Request
+Security Flow</a></li>
+<li><a href="#6-threadlocal--what-it-is-and-why-it-matters">ThreadLocal
+— What It Is and Why It Matters</a></li>
+<li><a href="#7-aop--aspect-oriented-programming">AOP — Aspect Oriented
+Programming</a></li>
+<li><a href="#8-hibernate-tenant-filter">Hibernate Tenant
+Filter</a></li>
+<li><a href="#9-transactions">Transactions</a></li>
+<li><a href="#10-multithreading">Multithreading</a></li>
+<li><a href="#11-end-to-end-flow-post-apipaymentspayment">End-to-End
+Flow: POST /api/payments/payment</a></li>
+<li><a href="#12-error-scenarios">Error Scenarios</a></li>
+<li><a href="#13-quick-reference--registration-map">Quick Reference —
+Registration Map</a></li>
+</ol>
+<hr />
+<h2 id="java-interfaces">1. Java Interfaces</h2>
+<h3 id="what-is-an-interface">What is an Interface?</h3>
+<p>An interface is a <strong>contract</strong>. It defines <em>what</em>
+methods a class must have, but not <em>how</em> those methods work. The
+implementing class provides the <em>how</em>.</p>
+<pre><code>Interface = &quot;what you must do&quot;
+Class     = &quot;how you actually do it&quot;</code></pre>
+<h3 id="real-example-repository-interfaces">Real Example — Repository
+Interfaces</h3>
+<p>Every repository in this project is an <strong>interface</strong>,
+not a class.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">// FarmerRepository.java</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">interface</span> FarmerRepository <span class="kw">extends</span> JpaRepository<span class="op">&lt;</span>Farmer<span class="op">,</span> <span class="bu">UUID</span><span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">List</span><span class="op">&lt;</span>Farmer<span class="op">&gt;</span> <span class="fu">search</span><span class="op">(</span><span class="bu">String</span> name<span class="op">,</span> <span class="bu">String</span> fatherName<span class="op">,</span> <span class="bu">UUID</span> villageId<span class="op">,</span> <span class="bu">String</span> mobile<span class="op">);</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">boolean</span> <span class="fu">existsByTenantIdAndBillNumber</span><span class="op">(</span><span class="bu">UUID</span> tenantId<span class="op">,</span> <span class="bu">String</span> billNumber<span class="op">);</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">// TransactionRepository.java</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">interface</span> TransactionRepository <span class="kw">extends</span> JpaRepository<span class="op">&lt;</span>Transaction<span class="op">,</span> <span class="bu">UUID</span><span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">BigDecimal</span> <span class="fu">sumGrandTotal</span><span class="op">(</span><span class="bu">UUID</span> farmerId<span class="op">,</span> TransactionType type<span class="op">,</span> TransactionStatus status<span class="op">);</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    Optional<span class="op">&lt;</span>Transaction<span class="op">&gt;</span> <span class="fu">findByBillNumber</span><span class="op">(</span><span class="bu">String</span> billNumber<span class="op">);</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong><code>JpaRepository&lt;T, ID&gt;</code></strong> is a Spring
+interface that already provides:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>SQL generated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>findById(id)</code></td>
+<td><code>SELECT * FROM table WHERE id = ?</code></td>
+</tr>
+<tr>
+<td><code>findAll()</code></td>
+<td><code>SELECT * FROM table</code></td>
+</tr>
+<tr>
+<td><code>save(entity)</code></td>
+<td><code>INSERT</code> or <code>UPDATE</code></td>
+</tr>
+<tr>
+<td><code>existsById(id)</code></td>
+<td><code>SELECT COUNT(*) FROM table WHERE id = ?</code></td>
+</tr>
+<tr>
+<td><code>deleteById(id)</code></td>
+<td><code>DELETE FROM table WHERE id = ?</code></td>
+</tr>
+</tbody>
+</table>
+<p>Spring Data JPA <strong>auto-generates the implementation</strong> at
+runtime — you never write a class.</p>
+<h3 id="why-interfaces-for-repositories">Why Interfaces for
+Repositories?</h3>
+<pre><code>FarmerRepository (interface)
+        ↓
+Spring auto-generates: FarmerRepositoryImpl (class) at startup
+        ↓
+PaymentService depends on: FarmerRepository (interface type)</code></pre>
+<ul>
+<li><strong>Loose coupling</strong> — <code>PaymentService</code> does
+not care what DB is behind it</li>
+<li><strong>Swappable</strong> — swap PostgreSQL for MongoDB by changing
+only the implementation</li>
+<li><strong>Testable</strong> — inject a mock that also implements the
+interface; no real DB needed</li>
+</ul>
+<div class="sourceCode" id="cb5"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// PaymentService.java</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">// All of these are INTERFACE types — not classes</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">private</span> <span class="dt">final</span> FarmerRepository farmerRepository<span class="op">;</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">private</span> <span class="dt">final</span> TransactionRepository transactionRepository<span class="op">;</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">private</span> <span class="dt">final</span> BillNumberTypeRepository billNumberTypeRepository<span class="op">;</span></span></code></pre></div>
+<h3 id="userdetails-interface"><code>UserDetails</code> Interface</h3>
+<p>Spring Security defines this interface to describe an authenticated
+user:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">interface</span> UserDetails <span class="op">{</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">String</span> <span class="fu">getUsername</span><span class="op">();</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">String</span> <span class="fu">getPassword</span><span class="op">();</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">Collection</span><span class="op">&lt;?</span> <span class="kw">extends</span> GrantedAuthority<span class="op">&gt;</span> <span class="fu">getAuthorities</span><span class="op">();</span> <span class="co">// roles</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">boolean</span> <span class="fu">isEnabled</span><span class="op">();</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">boolean</span> <span class="fu">isAccountNonExpired</span><span class="op">();</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">boolean</span> <span class="fu">isAccountNonLocked</span><span class="op">();</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">boolean</span> <span class="fu">isCredentialsNonExpired</span><span class="op">();</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><code>StaffUserPrincipal</code> implements it so Spring Security can
+store it in the session and use <code>getAuthorities()</code> for
+<code>@PreAuthorize</code> role checks:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> StaffUserPrincipal <span class="kw">implements</span> UserDetails<span class="op">,</span> <span class="bu">Serializable</span> <span class="op">{</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="dt">final</span> <span class="bu">UUID</span> userId<span class="op">;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="dt">final</span> <span class="bu">UUID</span> tenantId<span class="op">;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="dt">final</span> StaffRole role<span class="op">;</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Override</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="bu">Collection</span><span class="op">&lt;?</span> <span class="kw">extends</span> GrantedAuthority<span class="op">&gt;</span> <span class="fu">getAuthorities</span><span class="op">()</span> <span class="op">{</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">List</span><span class="op">.</span><span class="fu">of</span><span class="op">(</span><span class="kw">new</span> <span class="fu">SimpleGrantedAuthority</span><span class="op">(</span><span class="st">&quot;ROLE_&quot;</span> <span class="op">+</span> role<span class="op">.</span><span class="fu">name</span><span class="op">()));</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        <span class="co">// e.g. → &quot;ROLE_ADMIN&quot;, &quot;ROLE_STAFF&quot;, &quot;ROLE_SUPER_ADMIN&quot;</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h2 id="how-the-app-connects-to-the-database">2. How the App Connects to
+the Database</h2>
+<p>The connection goes through <strong>3 layers</strong>:</p>
+<h3 id="layer-1-connection-config-application.yml">Layer 1 — Connection
+Config (<code>application.yml</code>)</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">spring</span><span class="kw">:</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">datasource</span><span class="kw">:</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">url</span><span class="kw">:</span><span class="at"> ${DATABASE_URL:jdbc:postgresql://localhost:5432/rke}</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">username</span><span class="kw">:</span><span class="at"> ${DB_USERNAME:rke}</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">password</span><span class="kw">:</span><span class="at"> ${DB_PASSWORD:rke}</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">driver-class-name</span><span class="kw">:</span><span class="at"> org.postgresql.Driver</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jpa</span><span class="kw">:</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">hibernate</span><span class="kw">:</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ddl-auto</span><span class="kw">:</span><span class="at"> none</span><span class="co">       # Hibernate does NOT touch the schema</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">open-in-view</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span><span class="co">    # no lazy loading outside transactions</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">flyway</span><span class="kw">:</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">enabled</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">locations</span><span class="kw">:</span><span class="at"> classpath:db/migration</span></span></code></pre></div>
+<p>Spring Boot auto-creates a <strong>HikariCP connection pool</strong>
+from these properties.</p>
+<h4 id="what-is-hikaricp">What is HikariCP?</h4>
+<p>Opening a DB connection is expensive (20–100 ms). HikariCP maintains
+a pool of pre-opened connections (default: 10). Requests borrow a
+connection, use it, and return it — without opening/closing each
+time.</p>
+<pre><code>Request 1 → borrows connection from pool → runs SQL → returns connection
+Request 2 → borrows same connection      → runs SQL → returns connection
+(no open/close overhead per request)</code></pre>
+<h3 id="layer-2-flyway-schema-management">Layer 2 — Flyway (Schema
+Management)</h3>
+<p>On every app startup, Flyway runs pending SQL scripts in version
+order:</p>
+<pre><code>V1__init.sql          → creates all tables
+V2__seed_tenant.sql   → inserts RK Enterprises tenant
+V3__seed_admin.sql    → inserts admin user
+V4__add_return.sql    → adds column
+...
+V13__add_notes.sql    → latest migration</code></pre>
+<p>Flyway tracks which scripts already ran in a
+<code>flyway_schema_history</code> table, so it only applies new ones.
+<code>ddl-auto: none</code> means Hibernate <strong>never</strong>
+alters the schema — Flyway owns it completely.</p>
+<h3 id="layer-3-jpa-hibernate-java-db-mapping">Layer 3 — JPA / Hibernate
+(Java ↔︎ DB Mapping)</h3>
+<p>Entities map Java classes to DB tables:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">// BaseEntity.java — common columns for EVERY table</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="at">@MappedSuperclass</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">abstract</span> <span class="kw">class</span> BaseEntity <span class="op">{</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Id</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">@GeneratedValue</span><span class="op">(</span>strategy <span class="op">=</span> GenerationType<span class="op">.</span><span class="fu">UUID</span><span class="op">)</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Column</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;id&quot;</span><span class="op">,</span> nullable <span class="op">=</span> <span class="kw">false</span><span class="op">,</span> updatable <span class="op">=</span> <span class="kw">false</span><span class="op">)</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="bu">UUID</span> id<span class="op">;</span>           <span class="co">// → column: id</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">@CreationTimestamp</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Column</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;created_at&quot;</span><span class="op">,</span> nullable <span class="op">=</span> <span class="kw">false</span><span class="op">,</span> updatable <span class="op">=</span> <span class="kw">false</span><span class="op">)</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> Instant createdAt<span class="op">;</span> <span class="co">// → column: created_at</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">@UpdateTimestamp</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Column</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;updated_at&quot;</span><span class="op">,</span> nullable <span class="op">=</span> <span class="kw">false</span><span class="op">)</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> Instant updatedAt<span class="op">;</span> <span class="co">// → column: updated_at</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Farmer.java — maps to the &quot;farmers&quot; table</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Entity</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="at">@Table</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;farmers&quot;</span><span class="op">)</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="at">@Filter</span><span class="op">(</span>name <span class="op">=</span> TenantFilters<span class="op">.</span><span class="fu">NAME</span><span class="op">)</span>   <span class="co">// tenant isolation (see Section 8)</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> Farmer <span class="kw">extends</span> TenantScopedEntity <span class="op">{</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Column</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;name&quot;</span><span class="op">,</span> nullable <span class="op">=</span> <span class="kw">false</span><span class="op">)</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="bu">String</span> name<span class="op">;</span>          <span class="co">// → column: name</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Column</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;village_id&quot;</span><span class="op">,</span> nullable <span class="op">=</span> <span class="kw">false</span><span class="op">)</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> <span class="bu">UUID</span> villageId<span class="op">;</span>       <span class="co">// → column: village_id</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h4 id="inheritance-chain">Inheritance Chain</h4>
+<pre><code>BaseEntity          (id, createdAt, updatedAt)
+    └── TenantScopedEntity   (+ tenantId)
+            └── Farmer       (+ name, villageId, address ...)
+            └── Transaction  (+ farmerId, billNumber, grandTotal ...)</code></pre>
+<hr />
+<h2 id="api-design">3. API Design</h2>
+<h3 id="the-3-layer-pattern">The 3-Layer Pattern</h3>
+<p>Every feature follows the same structure:</p>
+<pre><code>HTTP Request
+    ↓
+Controller  →  receives request, validates, calls service
+    ↓
+Service     →  all business logic
+    ↓
+Repository  →  database
+    ↓
+HTTP Response</code></pre>
+<h3 id="url-design">URL Design</h3>
+<div class="sourceCode" id="cb15"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="at">@RestController</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="at">@RequestMapping</span><span class="op">(</span><span class="st">&quot;/api/farmers&quot;</span><span class="op">)</span>       <span class="co">// base URL</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> FarmerController <span class="op">{</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">@GetMapping</span>                        <span class="co">// GET  /api/farmers</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">@GetMapping</span><span class="op">(</span><span class="st">&quot;/{id}&quot;</span><span class="op">)</span>               <span class="co">// GET  /api/farmers/{id}</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">@PostMapping</span>                       <span class="co">// POST /api/farmers</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">@PutMapping</span><span class="op">(</span><span class="st">&quot;/{id}&quot;</span><span class="op">)</span>               <span class="co">// PUT  /api/farmers/{id}</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">@GetMapping</span><span class="op">(</span><span class="st">&quot;/{id}/balance&quot;</span><span class="op">)</span>       <span class="co">// GET  /api/farmers/{id}/balance</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>HTTP Method</th>
+<th>Purpose</th>
+<th>Status Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td>Read data</td>
+<td>200 OK</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td>Create new resource</td>
+<td>201 Created</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td>Full update</td>
+<td>200 OK</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td>Remove</td>
+<td>204 No Content</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>@PathVariable</code> → identifies a specific resource:
+<code>/api/farmers/uuid-here</code></li>
+<li><code>@RequestParam</code> → optional filters:
+<code>/api/farmers?name=ravi&amp;villageId=abc</code></li>
+</ul>
+<h3 id="dtos-request-and-response-objects">DTOs — Request and Response
+Objects</h3>
+<p>The domain entity is <strong>never</strong> exposed directly for
+writes. Separate record classes define exactly what the API accepts and
+returns.</p>
+<p><strong>Request DTO — with validation:</strong></p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">// PaymentRequest.java</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">record</span> <span class="fu">PaymentRequest</span><span class="op">(</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">@NotNull</span> <span class="bu">UUID</span> farmerId<span class="op">,</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">@NotNull</span> <span class="bu">UUID</span> billNumberTypeId<span class="op">,</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">@NotBlank</span> <span class="bu">String</span> billNumber<span class="op">,</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">@NotNull</span> LocalDate transactionDate<span class="op">,</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">@NotNull</span> <span class="at">@DecimalMin</span><span class="op">(</span><span class="st">&quot;0.01&quot;</span><span class="op">)</span> <span class="bu">BigDecimal</span> amount<span class="op">,</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">String</span> remarks</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="op">)</span> <span class="op">{}</span></span></code></pre></div>
+<p><strong>Response DTO — controls what leaves the API:</strong></p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">// TransactionResponse.java</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">record</span> <span class="fu">TransactionResponse</span><span class="op">(</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">UUID</span> id<span class="op">,</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">String</span> transactionNo<span class="op">,</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">UUID</span> farmerId<span class="op">,</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">String</span> billNumber<span class="op">,</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    TransactionType transactionType<span class="op">,</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">BigDecimal</span> grandTotal<span class="op">,</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    TransactionStatus status<span class="op">,</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">List</span><span class="op">&lt;</span>TransactionItemResponse<span class="op">&gt;</span> items</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// tenantId is NOT here — never exposed externally</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="op">)</span> <span class="op">{}</span></span></code></pre></div>
+<h3 id="valid-automatic-validation"><code>@Valid</code> — Automatic
+Validation</h3>
+<p><code>@Valid</code> on a controller parameter fires Bean Validation
+before the method runs. If any constraint fails →
+<code>400 Bad Request</code> automatically. Your method never
+executes.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="at">@PostMapping</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> Farmer <span class="fu">create</span><span class="op">(</span><span class="at">@Valid</span> <span class="at">@RequestBody</span> FarmerRequest request<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> service<span class="op">.</span><span class="fu">create</span><span class="op">(</span>request<span class="op">);</span>  <span class="co">// only reaches here if all validations pass</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="controllers-are-always-thin">Controllers Are Always Thin</h3>
+<div class="sourceCode" id="cb19"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co">// FarmerController.java — notice how simple it is</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="at">@PostMapping</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> Farmer <span class="fu">create</span><span class="op">(</span><span class="at">@Valid</span> <span class="at">@RequestBody</span> FarmerRequest request<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> service<span class="op">.</span><span class="fu">create</span><span class="op">(</span>request<span class="op">);</span>  <span class="co">// ALL logic is in FarmerService</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Zero business logic in the controller. If you add a second entry
+point (scheduled job, CLI), you call the same service.</p>
+<hr />
+<h2 id="spring-security">4. Spring Security</h2>
+<h3 id="dependency">Dependency</h3>
+<div class="sourceCode" id="cb20"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- pom.xml --&gt;</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>&lt;<span class="kw">dependency</span>&gt;</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    &lt;<span class="kw">groupId</span>&gt;org.springframework.boot&lt;/<span class="kw">groupId</span>&gt;</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    &lt;<span class="kw">artifactId</span>&gt;spring-boot-starter-security&lt;/<span class="kw">artifactId</span>&gt;</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>&lt;/<span class="kw">dependency</span>&gt;</span></code></pre></div>
+<h3 id="configuration-securityconfig.java">Configuration
+(<code>SecurityConfig.java</code>)</h3>
+<div class="sourceCode" id="cb21"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="at">@Configuration</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="at">@EnableWebSecurity</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="at">@EnableMethodSecurity</span>    <span class="co">// enables @PreAuthorize on all beans</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> SecurityConfig <span class="op">{</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Bean</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> PasswordEncoder <span class="fu">passwordEncoder</span><span class="op">()</span> <span class="op">{</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="kw">new</span> <span class="fu">BCryptPasswordEncoder</span><span class="op">();</span>   <span class="co">// passwords always hashed with BCrypt</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Bean</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> SecurityContextRepository <span class="fu">securityContextRepository</span><span class="op">()</span> <span class="op">{</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="kw">new</span> <span class="fu">HttpSessionSecurityContextRepository</span><span class="op">();</span> <span class="co">// session-based auth</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Bean</span></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> SecurityFilterChain <span class="fu">securityFilterChain</span><span class="op">(</span>HttpSecurity http<span class="op">,</span> <span class="kw">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>        http</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="fu">csrf</span><span class="op">(</span>csrf <span class="op">-&gt;</span> csrf<span class="op">.</span><span class="fu">disable</span><span class="op">())</span>           <span class="co">// safe: cookie is SameSite=Lax</span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="fu">authorizeHttpRequests</span><span class="op">(</span>reg <span class="op">-&gt;</span> reg</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>                <span class="op">.</span><span class="fu">requestMatchers</span><span class="op">(</span><span class="st">&quot;/api/auth/login&quot;</span><span class="op">,</span> <span class="st">&quot;/api/health&quot;</span><span class="op">).</span><span class="fu">permitAll</span><span class="op">()</span></span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>                <span class="op">.</span><span class="fu">anyRequest</span><span class="op">().</span><span class="fu">authenticated</span><span class="op">())</span>      <span class="co">// all other endpoints need login</span></span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="fu">sessionManagement</span><span class="op">(</span>sm <span class="op">-&gt;</span></span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>                sm<span class="op">.</span><span class="fu">sessionCreationPolicy</span><span class="op">(</span>SessionCreationPolicy<span class="op">.</span><span class="fu">IF_REQUIRED</span><span class="op">))</span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="fu">formLogin</span><span class="op">(</span>form <span class="op">-&gt;</span> form<span class="op">.</span><span class="fu">disable</span><span class="op">())</span>      <span class="co">// no form login</span></span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="fu">httpBasic</span><span class="op">(</span>basic <span class="op">-&gt;</span> basic<span class="op">.</span><span class="fu">disable</span><span class="op">());</span>   <span class="co">// no HTTP Basic auth</span></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> http<span class="op">.</span><span class="fu">build</span><span class="op">();</span></span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Decision</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auth type</td>
+<td>Session + cookie</td>
+<td>Simpler than JWT for this use case</td>
+</tr>
+<tr>
+<td>CSRF</td>
+<td>Disabled</td>
+<td>Cookie is SameSite=Lax</td>
+</tr>
+<tr>
+<td>Form login</td>
+<td>Disabled</td>
+<td>Custom <code>/api/auth/login</code> endpoint</td>
+</tr>
+<tr>
+<td>Password</td>
+<td>BCrypt</td>
+<td>Industry standard, one-way hash</td>
+</tr>
+</tbody>
+</table>
+<h3 id="login-flow">Login Flow</h3>
+<pre><code>Browser: POST /api/auth/login  { username, password, tenantSlug? }
+    ↓
+AuthService.login()
+    ↓
+1. staffUserRepository.findByUsername(username)
+2. passwordEncoder.matches(plaintext, user.getPasswordHash())
+3. StaffUserPrincipal.from(user)   → { userId, tenantId, role }
+4. UsernamePasswordAuthenticationToken(principal, null, authorities)
+5. securityContextRepository.saveContext(...)   → stored in HTTP session
+    ↓
+Browser: receives Set-Cookie: JSESSIONID=abc123
+Response: UserResponse { id, tenantId, username, role }  (NO password)</code></pre>
+<h3 id="logout">Logout</h3>
+<div class="sourceCode" id="cb23"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co">// AuthController.java</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="at">@PostMapping</span><span class="op">(</span><span class="st">&quot;/logout&quot;</span><span class="op">)</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="at">@ResponseStatus</span><span class="op">(</span>HttpStatus<span class="op">.</span><span class="fu">NO_CONTENT</span><span class="op">)</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="dt">void</span> <span class="fu">logout</span><span class="op">(</span>HttpServletRequest request<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    HttpSession session <span class="op">=</span> request<span class="op">.</span><span class="fu">getSession</span><span class="op">(</span><span class="kw">false</span><span class="op">);</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>session <span class="op">!=</span> <span class="kw">null</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>        session<span class="op">.</span><span class="fu">invalidate</span><span class="op">();</span>                   <span class="co">// destroy server-side session</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    SecurityContextHolder<span class="op">.</span><span class="fu">clearContext</span><span class="op">();</span>       <span class="co">// clear ThreadLocal too</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h2 id="the-8-step-request-security-flow">5. The 8-Step Request Security
+Flow</h2>
+<p>For every secured request
+(e.g. <code>POST /api/payments/payment</code>):</p>
+<pre><code>1. HttpSessionSecurityContextRepository  →  who are you?
+2. SecurityFilterChain                   →  are you allowed here?
+3. TenantContextFilter                   →  which tenant are you?
+4. TenantScopeInterceptor               →  are you in the right zone?
+5. @PreAuthorize                         →  do you have the right role?
+6. TenantFilterAspect                    →  lock DB queries to your tenant
+7. Business logic runs
+8. TenantContextFilter finally block    →  clean up ThreadLocal</code></pre>
+<h3 id="step-1-httpsessionsecuritycontextrepository">Step 1 —
+<code>HttpSessionSecurityContextRepository</code></h3>
+<p>Reads <code>JSESSIONID</code> cookie → looks up server-side session →
+finds saved <code>SecurityContext</code> → restores
+<code>StaffUserPrincipal</code> into
+<code>SecurityContextHolder</code>.</p>
+<h3 id="step-2-securityfilterchain">Step 2 —
+<code>SecurityFilterChain</code></h3>
+<p>Checks: is this URL in <code>permitAll()</code>? - YES
+(e.g. <code>/api/auth/login</code>) → passes through - NO → checks
+<code>SecurityContextHolder.getContext().getAuthentication().isAuthenticated()</code>
+- Not authenticated → <code>401 Unauthorized</code> - Authenticated →
+passes through</p>
+<h3 id="step-3-tenantcontextfilter.dofilterinternal">Step 3 —
+<code>TenantContextFilter.doFilterInternal()</code></h3>
+<div class="sourceCode" id="cb25"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>currentUserService<span class="op">.</span><span class="fu">currentPrincipal</span><span class="op">().</span><span class="fu">ifPresent</span><span class="op">(</span>principal <span class="op">-&gt;</span> <span class="op">{</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>principal<span class="op">.</span><span class="fu">getRole</span><span class="op">()</span> <span class="op">==</span> StaffRole<span class="op">.</span><span class="fu">SUPER_ADMIN</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Check for active impersonation in session</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">UUID</span> impersonated <span class="op">=</span> <span class="op">(</span><span class="bu">UUID</span><span class="op">)</span> session<span class="op">.</span><span class="fu">getAttribute</span><span class="op">(</span><span class="st">&quot;IMPERSONATED_TENANT_ID&quot;</span><span class="op">);</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>        TenantContext<span class="op">.</span><span class="fu">setTenantId</span><span class="op">(</span>impersonated<span class="op">);</span>  <span class="co">// null = cross-tenant access</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Normal user: lock to their own tenant</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        TenantContext<span class="op">.</span><span class="fu">setTenantId</span><span class="op">(</span>principal<span class="op">.</span><span class="fu">getTenantId</span><span class="op">());</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a><span class="op">});</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a><span class="co">// Calls filterChain.doFilter() to pass to next step</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a><span class="co">// finally { TenantContext.clear(); }  ← always cleans up (Step 8)</span></span></code></pre></div>
+<h3 id="step-4-tenantscopeinterceptor.prehandle">Step 4 —
+<code>TenantScopeInterceptor.preHandle()</code></h3>
+<div class="sourceCode" id="cb26"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Rule 1: /api/admin/** requires SUPER_ADMIN</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>path<span class="op">.</span><span class="fu">startsWith</span><span class="op">(</span><span class="st">&quot;/api/admin/&quot;</span><span class="op">)</span> <span class="op">&amp;&amp;</span> role <span class="op">!=</span> StaffRole<span class="op">.</span><span class="fu">SUPER_ADMIN</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">forbidden</span><span class="op">(</span>response<span class="op">,</span> <span class="st">&quot;Super admin access required&quot;</span><span class="op">);</span>  <span class="co">// 403</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a><span class="co">// Rule 2: all other /api/** require a tenant context</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>TenantContext<span class="op">.</span><span class="fu">getTenantId</span><span class="op">()</span> <span class="op">==</span> <span class="kw">null</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">forbidden</span><span class="op">(</span>response<span class="op">,</span> <span class="st">&quot;Tenant context required.&quot;</span><span class="op">);</span>     <span class="co">// 403</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="step-5-preauthorize-aop">Step 5 — <code>@PreAuthorize</code>
+(AOP)</h3>
+<p>Spring checks the annotation before the method body runs:</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co">// PaymentController.java</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="at">@PostMapping</span><span class="op">(</span><span class="st">&quot;/payment&quot;</span><span class="op">)</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a><span class="co">// No @PreAuthorize → STAFF + ADMIN can create</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> TransactionResponse <span class="fu">createPayment</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span> <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a><span class="at">@PutMapping</span><span class="op">(</span><span class="st">&quot;/payment/{id}&quot;</span><span class="op">)</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a><span class="at">@PreAuthorize</span><span class="op">(</span><span class="st">&quot;hasAnyRole(&#39;ADMIN&#39;,&#39;SUPER_ADMIN&#39;)&quot;</span><span class="op">)</span>  <span class="co">// STAFF gets 403</span></span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> TransactionResponse <span class="fu">updatePayment</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span> <span class="op">{</span> <span class="op">}</span></span></code></pre></div>
+<p>Spring checks <code>principal.getAuthorities()</code> which returns
+<code>[&quot;ROLE_STAFF&quot;]</code>, <code>[&quot;ROLE_ADMIN&quot;]</code>, or
+<code>[&quot;ROLE_SUPER_ADMIN&quot;]</code>.</p>
+<h3 id="step-6-tenantfilteraspect-aop">Step 6 —
+<code>TenantFilterAspect</code> (AOP)</h3>
+<p>Fires automatically before every repository method call (see Section
+7 &amp; 8).</p>
+<h3 id="step-7-business-logic">Step 7 — Business Logic</h3>
+<p><code>PaymentService</code>, <code>FarmerService</code>, etc. run
+here.</p>
+<h3 id="step-8-tenantcontextfilter-finally-block">Step 8 —
+<code>TenantContextFilter</code> finally block</h3>
+<div class="sourceCode" id="cb28"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="op">}</span> <span class="cf">finally</span> <span class="op">{</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    TenantContext<span class="op">.</span><span class="fu">clear</span><span class="op">();</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Thread goes back to Tomcat pool — starts completely clean</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h2 id="threadlocal-what-it-is-and-why-it-matters">6. ThreadLocal — What
+It Is and Why It Matters</h2>
+<p>A <code>ThreadLocal&lt;T&gt;</code> holds a value <strong>per
+thread</strong> — each thread has its own independent copy. No sharing,
+no locking needed.</p>
+<pre><code>Thread 1 (User A, Tenant X): TenantContext = UUID-for-tenant-X
+Thread 2 (User B, Tenant Y): TenantContext = UUID-for-tenant-Y
+// completely isolated — neither can see the other&#39;s value</code></pre>
+<p>Since Tomcat handles each request on its own thread, ThreadLocals
+ensure per-request isolation automatically.</p>
+<h3 id="two-threadlocals-in-this-project">Two ThreadLocals in This
+Project</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th></th>
+<th>ThreadLocal #1</th>
+<th>ThreadLocal #2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Name</strong></td>
+<td><code>SecurityContextHolder</code></td>
+<td><code>TenantContext</code></td>
+</tr>
+<tr>
+<td><strong>Holds</strong></td>
+<td><code>StaffUserPrincipal</code> — who you are</td>
+<td><code>UUID</code> tenantId — which tenant</td>
+</tr>
+<tr>
+<td><strong>Written by</strong></td>
+<td>Step 1 (HttpSessionRepo)</td>
+<td>Step 3 (TenantContextFilter)</td>
+</tr>
+<tr>
+<td><strong>Read by</strong></td>
+<td>Steps 3, 5</td>
+<td>Steps 4, 6</td>
+</tr>
+<tr>
+<td><strong>Cleared by</strong></td>
+<td>Spring Security automatically</td>
+<td>Step 8 finally block</td>
+</tr>
+<tr>
+<td><strong>Defined in</strong></td>
+<td>Spring Security internals</td>
+<td><code>TenantContext.java</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="tenantcontextfilter-is-the-bridge"><code>TenantContextFilter</code>
+Is the Bridge</h3>
+<p>It <strong>reads</strong> ThreadLocal #1 and <strong>writes</strong>
+ThreadLocal #2:</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Reads from SecurityContextHolder (ThreadLocal #1)</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>currentUserService<span class="op">.</span><span class="fu">currentPrincipal</span><span class="op">()</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Writes to TenantContext (ThreadLocal #2)</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>TenantContext<span class="op">.</span><span class="fu">setTenantId</span><span class="op">(</span>principal<span class="op">.</span><span class="fu">getTenantId</span><span class="op">())</span></span></code></pre></div>
+<h3 id="why-clear-is-critical">Why <code>clear()</code> Is Critical</h3>
+<p>Tomcat reuses threads. Without clearing:</p>
+<pre><code>Request from Tenant A → TenantContext = tenant-A-uuid
+Request ends → thread goes back to pool
+Next request (Tenant B) picks up same thread
+TenantContext still = tenant-A-uuid  ← DATA LEAK!</code></pre>
+<p>With <code>finally { TenantContext.clear(); }</code> — the thread is
+always clean.</p>
+<hr />
+<h2 id="aop-aspect-oriented-programming">7. AOP — Aspect Oriented
+Programming</h2>
+<h3 id="what-is-aop">What Is AOP?</h3>
+<p>AOP lets you automatically run code before or after specific methods
+— without modifying those methods. You define a rule once (“run this
+before every repository call”) and Spring applies it everywhere.</p>
+<h3 id="what-is-an-aop-proxy">What Is an AOP Proxy?</h3>
+<p>At startup, Spring reads <code>@Aspect</code> classes and
+<strong>wraps matching beans in proxy objects</strong> that look
+identical to the original but intercept calls.</p>
+<pre><code>Without AOP:
+PaymentService → farmerRepository.findById()   (direct call)
+
+With AOP:
+PaymentService → FarmerRepositoryProxy.findById()
+                    → runs TenantFilterAspect.enableTenantFilter()  ← first
+                    → calls real farmerRepository.findById()         ← second</code></pre>
+<p><code>PaymentService</code> never knows a proxy exists. It calls the
+interface — Spring substitutes the proxy silently.</p>
+<h3 id="tenantfilteraspect-full-code"><code>TenantFilterAspect</code> —
+Full Code</h3>
+<div class="sourceCode" id="cb33"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">// TenantFilterAspect.java</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Aspect</span>     <span class="co">// this class contains AOP advice</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="at">@Component</span>  <span class="co">// make it a Spring bean</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> TenantFilterAspect <span class="op">{</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">@PersistenceContext</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">private</span> EntityManager entityManager<span class="op">;</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">@Before</span><span class="op">(</span><span class="st">&quot;execution(* com.rke.backend..repository..*(..))&quot;</span><span class="op">)</span></span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">//      ↑ fires before ANY method in ANY repository class</span></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">enableTenantFilter</span><span class="op">()</span> <span class="op">{</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>        <span class="bu">UUID</span> tenantId <span class="op">=</span> TenantContext<span class="op">.</span><span class="fu">getTenantId</span><span class="op">();</span></span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>tenantId <span class="op">==</span> <span class="kw">null</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span><span class="op">;</span>  <span class="co">// SUPER_ADMIN cross-tenant — skip filter</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>        Session session <span class="op">=</span> entityManager<span class="op">.</span><span class="fu">unwrap</span><span class="op">(</span>Session<span class="op">.</span><span class="fu">class</span><span class="op">);</span></span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a>        session<span class="op">.</span><span class="fu">enableFilter</span><span class="op">(</span>TenantFilters<span class="op">.</span><span class="fu">NAME</span><span class="op">)</span></span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>               <span class="op">.</span><span class="fu">setParameter</span><span class="op">(</span>TenantFilters<span class="op">.</span><span class="fu">PARAM</span><span class="op">,</span> tenantId<span class="op">);</span></span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="pointcut-expression-breakdown">Pointcut Expression
+Breakdown</h3>
+<pre><code>@Before(&quot;execution(* com.rke.backend..repository..*(..))&quot;)
+         ─────────  ─  ──────────────────────────  ─  ──
+           when   any       package path          any  any
+         method   return                         class args
+           called type</code></pre>
+<p>Covers all 17 repositories:</p>
+<pre><code>FarmerRepository           ✓
+TransactionRepository      ✓
+BillNumberTypeRepository   ✓
+VillageRepository          ✓
+StaffUserRepository        ✓
+TenantRepository           ✓  (fires, but filter skipped when tenantId is null)
+AuditLogRepository         ✓
+CottonLotRepository        ✓
+... all 17                 ✓</code></pre>
+<h3 id="how-many-times-does-it-fire">How Many Times Does It Fire?</h3>
+<p>Once per repository method call. In
+<code>PaymentService.createPayment()</code>:</p>
+<pre><code>farmerRepository.findById()                → aspect fires (1)
+billNumberTypeRepository.findById()        → aspect fires (2)
+transactionRepository.existsBy...()       → aspect fires (3)
+transactionRepository.save()              → aspect fires (4)
+auditLogRepository.save()                 → aspect fires (5)</code></pre>
+<p>5 repository calls → aspect fires 5 times. Each time re-enables the
+filter.</p>
+<h3 id="featureguardaspect-another-aop-use"><code>FeatureGuardAspect</code>
+— Another AOP Use</h3>
+<div class="sourceCode" id="cb37"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co">// FeatureGuardAspect.java</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Before</span><span class="op">(</span><span class="st">&quot;@annotation(requiresFeature)&quot;</span><span class="op">)</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="dt">void</span> <span class="fu">checkFeature</span><span class="op">(</span>RequiresFeature requiresFeature<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>tenantFeatureService<span class="op">.</span><span class="fu">isEnabled</span><span class="op">(</span>tenantId<span class="op">,</span> requiresFeature<span class="op">.</span><span class="fu">value</span><span class="op">()))</span> <span class="op">{</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">throw</span> <span class="kw">new</span> <span class="fu">ResponseStatusException</span><span class="op">(</span>HttpStatus<span class="op">.</span><span class="fu">FORBIDDEN</span><span class="op">,</span> <span class="st">&quot;Feature not enabled&quot;</span><span class="op">);</span></span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Used like this:</p>
+<div class="sourceCode" id="cb38"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="at">@GetMapping</span><span class="op">(</span><span class="st">&quot;/api/cotton-lots&quot;</span><span class="op">)</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="at">@RequiresFeature</span><span class="op">(</span><span class="st">&quot;cotton_procurement&quot;</span><span class="op">)</span>   <span class="co">// 403 if this tenant doesn&#39;t have the feature</span></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="bu">List</span><span class="op">&lt;</span>CottonLot<span class="op">&gt;</span> <span class="fu">list</span><span class="op">()</span> <span class="op">{</span> <span class="kw">...</span> <span class="op">}</span></span></code></pre></div>
+<hr />
+<h2 id="hibernate-tenant-filter">8. Hibernate Tenant Filter</h2>
+<h3 id="the-problem-it-solves">The Problem It Solves</h3>
+<p>Without a filter, you must manually add
+<code>AND tenant_id = ?</code> to <strong>every</strong> query:</p>
+<div class="sourceCode" id="cb39"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co">// The fragile &quot;manual&quot; approach — forget once → data leak</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Query</span><span class="op">(</span><span class="st">&quot;SELECT f FROM Farmer f WHERE f.name LIKE :name AND f.tenantId = :tenantId&quot;</span><span class="op">)</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="bu">List</span><span class="op">&lt;</span>Farmer<span class="op">&gt;</span> <span class="fu">search</span><span class="op">(</span><span class="at">@Param</span><span class="op">(</span><span class="st">&quot;name&quot;</span><span class="op">)</span> <span class="bu">String</span> name<span class="op">,</span> <span class="at">@Param</span><span class="op">(</span><span class="st">&quot;tenantId&quot;</span><span class="op">)</span> <span class="bu">UUID</span> tenantId<span class="op">);</span></span></code></pre></div>
+<p>With the Hibernate filter, you define the condition
+<strong>once</strong> and it applies everywhere automatically.
+Impossible to forget.</p>
+<h3 id="the-3-pieces">The 3 Pieces</h3>
+<h4 id="piece-1-filterdef-in-package-info.java-the-blueprint">Piece 1 —
+<code>@FilterDef</code> in <code>package-info.java</code> (the
+Blueprint)</h4>
+<div class="sourceCode" id="cb40"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co">// package-info.java — applies to the whole domain package</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="at">@FilterDef</span><span class="op">(</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    name <span class="op">=</span> <span class="st">&quot;tenantFilter&quot;</span><span class="op">,</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    parameters <span class="op">=</span> <span class="at">@ParamDef</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;tenantId&quot;</span><span class="op">,</span> type <span class="op">=</span> <span class="bu">UUID</span><span class="op">.</span><span class="fu">class</span><span class="op">),</span></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    defaultCondition <span class="op">=</span> <span class="st">&quot;tenant_id = :tenantId&quot;</span>   <span class="co">// SQL appended to every query</span></span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a><span class="op">)</span></span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a><span class="kw">package</span><span class="im"> com</span><span class="op">.</span><span class="im">rke</span><span class="op">.</span><span class="im">backend</span><span class="op">.</span><span class="im">domain</span><span class="op">;</span></span></code></pre></div>
+<p>Defined once. Does nothing by itself — just declares that the filter
+exists.</p>
+<h4 id="piece-2-filter-on-each-entity-the-opt-in">Piece 2 —
+<code>@Filter</code> on Each Entity (the Opt-In)</h4>
+<div class="sourceCode" id="cb41"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Farmer.java</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Entity</span></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="at">@Table</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;farmers&quot;</span><span class="op">)</span></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="at">@Filter</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;tenantFilter&quot;</span><span class="op">)</span>    <span class="co">// ← opts in</span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> Farmer <span class="kw">extends</span> TenantScopedEntity <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a><span class="co">// Transaction.java</span></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a><span class="at">@Entity</span></span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a><span class="at">@Table</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;transactions&quot;</span><span class="op">)</span></span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a><span class="at">@Filter</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;tenantFilter&quot;</span><span class="op">)</span>    <span class="co">// ← opts in</span></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> Transaction <span class="kw">extends</span> FinancialEntity <span class="op">{</span> <span class="op">}</span></span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a><span class="co">// Tenant.java</span></span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a><span class="at">@Entity</span></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a><span class="at">@Table</span><span class="op">(</span>name <span class="op">=</span> <span class="st">&quot;tenants&quot;</span><span class="op">)</span></span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a><span class="co">// NO @Filter                     // ← intentionally skipped</span></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> Tenant <span class="kw">extends</span> BaseEntity <span class="op">{</span> <span class="op">}</span></span></code></pre></div>
+<p><code>Tenant</code> has no filter because you need to query all
+tenants during login (e.g. look up a tenant by slug).</p>
+<h4 id="piece-3-enablefilter-in-tenantfilteraspect-the-activation">Piece
+3 — <code>enableFilter()</code> in <code>TenantFilterAspect</code> (the
+Activation)</h4>
+<div class="sourceCode" id="cb42"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>session<span class="op">.</span><span class="fu">enableFilter</span><span class="op">(</span><span class="st">&quot;tenantFilter&quot;</span><span class="op">)</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>       <span class="op">.</span><span class="fu">setParameter</span><span class="op">(</span><span class="st">&quot;tenantId&quot;</span><span class="op">,</span> tenantId<span class="op">);</span>  <span class="co">// plug in the actual UUID value</span></span></code></pre></div>
+<p>Without this call, the filter is defined and opted-in, but
+<strong>never active</strong>. SQL runs without the tenant clause.</p>
+<h3 id="sql-before-and-after">SQL Before and After</h3>
+<div class="sourceCode" id="cb43"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Java — same code in both cases</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>farmerRepository<span class="op">.</span><span class="fu">findById</span><span class="op">(</span>farmerId<span class="op">)</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>farmerRepository<span class="op">.</span><span class="fu">findAll</span><span class="op">()</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>farmerRepository<span class="op">.</span><span class="fu">search</span><span class="op">(</span><span class="st">&quot;ravi&quot;</span><span class="op">,</span> <span class="kw">null</span><span class="op">,</span> <span class="kw">null</span><span class="op">,</span> <span class="kw">null</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb44"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- WITHOUT filter (TenantContext = null, e.g. SUPER_ADMIN):</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers <span class="kw">WHERE</span> <span class="kw">id</span> <span class="op">=</span> <span class="st">&#39;uuid-111&#39;</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers <span class="kw">WHERE</span> name <span class="kw">LIKE</span> <span class="st">&#39;%ravi%&#39;</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- WITH filter active (TenantContext = &#39;tenant-uuid&#39;):</span></span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers <span class="kw">WHERE</span> <span class="kw">id</span> <span class="op">=</span> <span class="st">&#39;uuid-111&#39;</span> <span class="kw">AND</span> tenant_id <span class="op">=</span> <span class="st">&#39;tenant-uuid&#39;</span></span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers <span class="kw">WHERE</span> tenant_id <span class="op">=</span> <span class="st">&#39;tenant-uuid&#39;</span></span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> farmers <span class="kw">WHERE</span> name <span class="kw">LIKE</span> <span class="st">&#39;%ravi%&#39;</span> <span class="kw">AND</span> tenant_id <span class="op">=</span> <span class="st">&#39;tenant-uuid&#39;</span></span></code></pre></div>
+<p>You wrote <strong>zero</strong> <code>AND tenant_id</code> clauses.
+Hibernate added them all.</p>
+<h3 id="which-entities-have-the-filter">Which Entities Have the
+Filter?</h3>
+<table>
+<thead>
+<tr>
+<th>Entity</th>
+<th><code>@Filter</code>?</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Farmer</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>Transaction</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>Village</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>Item</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>StaffUser</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>CottonLot</code></td>
+<td>✓ Yes</td>
+<td>Belongs to a tenant</td>
+</tr>
+<tr>
+<td><code>Tenant</code></td>
+<td>✗ No</td>
+<td>IS the tenant table</td>
+</tr>
+<tr>
+<td><code>AuditLog</code></td>
+<td>✗ No</td>
+<td>Super admin needs cross-tenant access</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="transactions">9. Transactions</h2>
+<h3 id="what-is-transactional">What Is <code>@Transactional</code>?</h3>
+<p>It wraps a method in a DB transaction. All DB operations inside are
+one atomic unit — ALL succeed and commit together, or if any one fails,
+ALL roll back.</p>
+<div class="sourceCode" id="cb45"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="co">// PaymentService.java</span></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Transactional</span></span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> TransactionResponse <span class="fu">createPayment</span><span class="op">(</span>PaymentRequest request<span class="op">,</span> TransactionType type<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">// All inside ONE transaction:</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>    farmerRepository<span class="op">.</span><span class="fu">findById</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span>          <span class="co">// SELECT</span></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>    billNumberTypeRepository<span class="op">.</span><span class="fu">findById</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span>  <span class="co">// SELECT</span></span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>    transactionRepository<span class="op">.</span><span class="fu">existsBy</span><span class="kw">...</span><span class="op">()</span>    <span class="co">// SELECT</span></span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>    transactionRepository<span class="op">.</span><span class="fu">save</span><span class="op">(</span>tx<span class="op">)</span>         <span class="co">// INSERT ← if this fails...</span></span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>    auditService<span class="op">.</span><span class="fu">record</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span>               <span class="co">// INSERT ← this rolls back too</span></span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// BOTH INSERTs committed together, or neither</span></span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="transactionalreadonly-true"><code>@Transactional(readOnly = true)</code></h3>
+<p>Used on read-only methods. Tells Hibernate “this transaction won’t
+write” — Hibernate can apply optimisations like skipping dirty
+checking.</p>
+<div class="sourceCode" id="cb46"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="at">@Transactional</span><span class="op">(</span>readOnly <span class="op">=</span> <span class="kw">true</span><span class="op">)</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="bu">BigDecimal</span> <span class="fu">getOutstandingBalance</span><span class="op">(</span><span class="bu">UUID</span> farmerId<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">// only reads, no writes</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="propagation.mandatory"><code>Propagation.MANDATORY</code></h3>
+<p>Means: “I must be called from within an already-open transaction. If
+there is no active transaction, throw an exception immediately.”</p>
+<div class="sourceCode" id="cb47"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="co">// AuditService.java</span></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="at">@Transactional</span><span class="op">(</span>propagation <span class="op">=</span> Propagation<span class="op">.</span><span class="fu">MANDATORY</span><span class="op">)</span></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="dt">void</span> <span class="kw">record</span><span class="op">(</span><span class="kw">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>    auditLogRepository<span class="op">.</span><span class="fu">save</span><span class="op">(</span>log<span class="op">);</span></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>This ensures the audit log row always commits atomically with the
+change it describes — enforced at compile time. Calling it without an
+active transaction fails loudly during development.</p>
+<hr />
+<h2 id="multithreading">10. Multithreading</h2>
+<h3 id="implicit-tomcat-thread-pool">Implicit — Tomcat Thread Pool</h3>
+<p>Every HTTP request gets its own thread from Tomcat’s built-in pool.
+You wrote zero threading code for this — Spring Boot + Tomcat handles
+it.</p>
+<pre><code>User A sends request → Tomcat assigns Thread-1 → SecurityContextHolder[T1] = User A
+User B sends request → Tomcat assigns Thread-2 → SecurityContextHolder[T2] = User B
+(both run at the same time, completely isolated)</code></pre>
+<p>This is why ThreadLocals exist — to isolate per-request state across
+concurrent threads.</p>
+<h3 id="explicit-simulation-package-only">Explicit — Simulation Package
+Only</h3>
+<p><code>DbPoolExhaustionScenario</code> and
+<code>HistoricalIncidentScenario</code> use real multithreading to
+deliberately exhaust the DB connection pool for incident simulation/demo
+purposes. <strong>Not real business logic.</strong></p>
+<div class="sourceCode" id="cb49"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="co">// DbPoolExhaustionScenario.java</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="bu">ExecutorService</span> pool <span class="op">=</span> <span class="bu">Executors</span><span class="op">.</span><span class="fu">newFixedThreadPool</span><span class="op">(</span><span class="dv">4</span><span class="op">);</span></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="bu">CountDownLatch</span> allHolding <span class="op">=</span> <span class="kw">new</span> <span class="bu">CountDownLatch</span><span class="op">(</span><span class="dv">4</span><span class="op">);</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="bu">CountDownLatch</span> releaseLatch <span class="op">=</span> <span class="kw">new</span> <span class="bu">CountDownLatch</span><span class="op">(</span><span class="dv">1</span><span class="op">);</span></span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">4</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>    pool<span class="op">.</span><span class="fu">submit</span><span class="op">(()</span> <span class="op">-&gt;</span> <span class="op">{</span></span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">Connection</span> conn <span class="op">=</span> dataSource<span class="op">.</span><span class="fu">getConnection</span><span class="op">();</span>   <span class="co">// grab a connection</span></span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>        <span class="kw">synchronized</span> <span class="op">(</span>heldConnections<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>            heldConnections<span class="op">.</span><span class="fu">add</span><span class="op">(</span>conn<span class="op">);</span>                  <span class="co">// thread-safe list write</span></span>
+<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>        allHolding<span class="op">.</span><span class="fu">countDown</span><span class="op">();</span>    <span class="co">// &quot;I&#39;m ready&quot;</span></span>
+<span id="cb49-13"><a href="#cb49-13" aria-hidden="true" tabindex="-1"></a>        releaseLatch<span class="op">.</span><span class="fu">await</span><span class="op">(</span><span class="kw">...</span><span class="op">);</span>   <span class="co">// hold the connection until told to release</span></span>
+<span id="cb49-14"><a href="#cb49-14" aria-hidden="true" tabindex="-1"></a>    <span class="op">});</span></span>
+<span id="cb49-15"><a href="#cb49-15" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb49-16"><a href="#cb49-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-17"><a href="#cb49-17" aria-hidden="true" tabindex="-1"></a>allHolding<span class="op">.</span><span class="fu">await</span><span class="op">(</span><span class="kw">...</span><span class="op">);</span>             <span class="co">// wait until all 4 are holding</span></span>
+<span id="cb49-18"><a href="#cb49-18" aria-hidden="true" tabindex="-1"></a><span class="co">// now try one more connection → TIMES OUT → 500 error (the simulation)</span></span></code></pre></div>
+<h4 id="concurrency-concepts-used">Concurrency Concepts Used</h4>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Concept</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ExecutorService</code> /
+<code>newFixedThreadPool(n)</code></td>
+<td>Creates and manages a fixed pool of worker threads</td>
+</tr>
+<tr>
+<td><code>CountDownLatch(n)</code></td>
+<td>A countdown gate — <code>await()</code> blocks until count reaches 0
+via <code>countDown()</code></td>
+</tr>
+<tr>
+<td><code>synchronized(list)</code></td>
+<td>Locks a block so only one thread can execute it at a time</td>
+</tr>
+<tr>
+<td><code>Thread.currentThread().interrupt()</code></td>
+<td>Restores the interrupted flag after catching
+<code>InterruptedException</code></td>
+</tr>
+<tr>
+<td><code>pool.shutdownNow()</code></td>
+<td>Cancels all tasks and stops worker threads — always called in
+<code>finally</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="end-to-end-flow-post-apipaymentspayment">11. End-to-End Flow:
+POST /api/payments/payment</h2>
+<p><strong>Request:</strong></p>
+<pre><code>POST /api/payments/payment
+Cookie: JSESSIONID=abc123
+Content-Type: application/json
+
+{
+  &quot;farmerId&quot;: &quot;uuid-111&quot;,
+  &quot;billNumberTypeId&quot;: &quot;uuid-222&quot;,
+  &quot;billNumber&quot;: &quot;RKEPV-0001&quot;,
+  &quot;transactionDate&quot;: &quot;2026-10-06&quot;,
+  &quot;amount&quot;: 5000.00
+}</code></pre>
+<h3 id="step-by-step-execution">Step-by-Step Execution</h3>
+<pre><code>① HttpSessionSecurityContextRepository
+   Reads JSESSIONID=abc123
+   Restores StaffUserPrincipal { userId, tenantId=&#39;tenant-uuid&#39;, role=STAFF }
+   into SecurityContextHolder
+
+② SecurityFilterChain
+   /api/payments/payment is NOT in permitAll()
+   isAuthenticated() → YES (principal restored in ①)
+   ✓ passes through
+
+③ TenantContextFilter.doFilterInternal()
+   currentUserService.currentPrincipal() → reads from SecurityContextHolder
+   role == SUPER_ADMIN? → NO (role = STAFF)
+   TenantContext.setTenantId(&#39;tenant-uuid&#39;)
+   ThreadLocal #2 is now set
+
+④ TenantScopeInterceptor.preHandle()
+   path.startsWith(&#39;/api/admin/&#39;)? → NO
+   TenantContext.getTenantId() == null? → NO (&#39;tenant-uuid&#39; is set)
+   ✓ returns true → passes through
+
+⑤ Controller — PaymentController.createPayment()
+   @PreAuthorize? → NONE on createPayment → STAFF allowed
+   @Valid → validates PaymentRequest:
+     farmerId        @NotNull → present ✓
+     billNumberTypeId @NotNull → present ✓
+     billNumber      @NotBlank → &#39;RKEPV-0001&#39; ✓
+     transactionDate @NotNull → present ✓
+     amount     @DecimalMin(0.01) → 5000.00 ✓
+   Calls: paymentService.createPayment(request, CASH_PAYMENT)
+
+⑥ @Transactional begins
+   Spring opens a DB transaction
+
+⑦ PaymentService.createPayment() runs:
+
+   a) currentUserService.getTenantId()
+      Reads TenantContext → &#39;tenant-uuid&#39;
+
+   b) TenantFilterAspect fires → filter enabled
+      farmerRepository.findById(&#39;uuid-111&#39;)
+      SQL: SELECT * FROM farmers
+           WHERE id = &#39;uuid-111&#39;
+           AND tenant_id = &#39;tenant-uuid&#39;   ← injected
+      → Farmer found ✓
+
+   c) TenantFilterAspect fires again → filter re-enabled
+      billNumberTypeRepository.findById(&#39;uuid-222&#39;)
+      SQL: SELECT * FROM bill_number_types
+           WHERE id = &#39;uuid-222&#39;
+           AND tenant_id = &#39;tenant-uuid&#39;   ← injected
+      → BillNumberType found ✓
+
+   d) TenantFilterAspect fires again
+      transactionRepository.existsByTenantIdAndBillNumber(
+          &#39;tenant-uuid&#39;, &#39;RKEPV-0001&#39;
+      )
+      SQL: SELECT COUNT(*) FROM transactions
+           WHERE tenant_id = &#39;tenant-uuid&#39;
+           AND bill_number = &#39;RKEPV-0001&#39;
+      → 0 (not a duplicate) ✓
+
+   e) Build Transaction entity:
+      Transaction.builder()
+        .tenantId(&#39;tenant-uuid&#39;)
+        .farmerId(&#39;uuid-111&#39;)
+        .billNumber(&#39;RKEPV-0001&#39;)
+        .transactionNo(generateTransactionNo())  → &#39;2026-RKEPV-0001-1&#39;
+        .transactionType(CASH_PAYMENT)
+        .transactionDate(2026-10-06)
+        .grandTotal(5000.00)
+        .status(ACTIVE)
+        .build()
+
+   f) TenantFilterAspect fires
+      transactionRepository.save(tx)
+      SQL: INSERT INTO transactions (id, tenant_id, farmer_id,
+           bill_number, transaction_no, transaction_type,
+           transaction_date, grand_total, status, created_at)
+           VALUES (gen_random_uuid(), &#39;tenant-uuid&#39;, &#39;uuid-111&#39;,
+           &#39;RKEPV-0001&#39;, &#39;2026-RKEPV-0001-1&#39;, &#39;cash_payment&#39;,
+           &#39;2026-10-06&#39;, 5000.00, &#39;active&#39;, now())
+
+   g) TenantFilterAspect fires
+      auditService.record(&#39;transactions&#39;, tx.getId(), INSERT, null, snapshot)
+      SQL: INSERT INTO audit_log (tenant_id, table_name, record_id,
+           action, changed_by, new_values, changed_at)
+           VALUES (&#39;tenant-uuid&#39;, &#39;transactions&#39;, &#39;new-tx-uuid&#39;,
+           &#39;INSERT&#39;, &#39;user-uuid&#39;, &#39;{ ...full JSON... }&#39;, now())
+
+⑥ @Transactional commits
+   Both INSERTs commit together as one DB transaction
+
+⑧ TenantContextFilter finally block
+   TenantContext.clear()
+   Thread returns to Tomcat pool — clean for next request</code></pre>
+<p><strong>Response:</strong> <code>201 Created</code></p>
+<div class="sourceCode" id="cb52"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;new-tx-uuid&quot;</span><span class="fu">,</span></span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;transactionNo&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-RKEPV-0001-1&quot;</span><span class="fu">,</span></span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;farmerId&quot;</span><span class="fu">:</span> <span class="st">&quot;uuid-111&quot;</span><span class="fu">,</span></span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;billNumber&quot;</span><span class="fu">:</span> <span class="st">&quot;RKEPV-0001&quot;</span><span class="fu">,</span></span>
+<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;transactionType&quot;</span><span class="fu">:</span> <span class="st">&quot;CASH_PAYMENT&quot;</span><span class="fu">,</span></span>
+<span id="cb52-7"><a href="#cb52-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;transactionDate&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-10-06&quot;</span><span class="fu">,</span></span>
+<span id="cb52-8"><a href="#cb52-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;grandTotal&quot;</span><span class="fu">:</span> <span class="fl">5000.00</span><span class="fu">,</span></span>
+<span id="cb52-9"><a href="#cb52-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;ACTIVE&quot;</span><span class="fu">,</span></span>
+<span id="cb52-10"><a href="#cb52-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;items&quot;</span><span class="fu">:</span> <span class="ot">[]</span></span>
+<span id="cb52-11"><a href="#cb52-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h2 id="error-scenarios">12. Error Scenarios</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Where it fails</th>
+<th>Cause</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Step ①</td>
+<td>No cookie or expired session</td>
+<td><code>401 Unauthorized</code></td>
+</tr>
+<tr>
+<td>Step ②</td>
+<td>Session exists but not authenticated</td>
+<td><code>401 Unauthorized</code></td>
+</tr>
+<tr>
+<td>Step ③</td>
+<td>SUPER_ADMIN, no impersonation active</td>
+<td><code>TenantContext = null</code></td>
+</tr>
+<tr>
+<td>Step ④</td>
+<td>Hits <code>/api/admin/**</code> without SUPER_ADMIN role</td>
+<td><code>403 Forbidden</code></td>
+</tr>
+<tr>
+<td>Step ④</td>
+<td><code>TenantContext</code> is null on tenant endpoint</td>
+<td><code>403 Forbidden</code></td>
+</tr>
+<tr>
+<td>Step ⑤</td>
+<td><code>@Valid</code> — amount is <code>-100</code> (fails
+<code>@DecimalMin</code>)</td>
+<td><code>400 Bad Request</code></td>
+</tr>
+<tr>
+<td>Step ⑤</td>
+<td>STAFF hits <code>PUT /api/payments/payment/{id}</code></td>
+<td><code>403 Forbidden</code></td>
+</tr>
+<tr>
+<td>Step ⑦</td>
+<td><code>farmerRepository.findById()</code> returns empty</td>
+<td><code>404 Not Found</code></td>
+</tr>
+<tr>
+<td>Step ⑦</td>
+<td><code>existsByTenantIdAndBillNumber()</code> returns true</td>
+<td><code>409 Conflict</code></td>
+</tr>
+<tr>
+<td>Step ⑦</td>
+<td>Any DB error throws an exception</td>
+<td>Both INSERTs rolled back,
+<code>500 Internal Server Error</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="quick-reference-registration-map">13. Quick Reference —
+Registration Map</h2>
+<p>How Spring knows to run each security step in the correct order:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Step</th>
+<th>Component</th>
+<th>Registered Where</th>
+<th>Registration Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>HttpSessionSecurityContextRepository</code></td>
+<td><code>SecurityConfig.java</code></td>
+<td><code>@Bean</code> +
+<code>.securityContext(sc -&gt; sc.securityContextRepository(repo))</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>SecurityFilterChain</code></td>
+<td><code>SecurityConfig.java</code></td>
+<td><code>http.authorizeHttpRequests(...)</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>TenantContextFilter</code></td>
+<td><code>TenantContextFilter.java</code> itself</td>
+<td><code>@Component</code> +
+<code>extends OncePerRequestFilter</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>TenantScopeInterceptor</code></td>
+<td><code>WebMvcConfig.java</code></td>
+<td><code>registry.addInterceptor(...)</code> in
+<code>addInterceptors()</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>@PreAuthorize</code></td>
+<td><code>SecurityConfig.java</code></td>
+<td><code>@EnableMethodSecurity</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>TenantFilterAspect</code></td>
+<td><code>TenantFilterAspect.java</code> itself</td>
+<td><code>@Aspect</code> + <code>@Component</code> +
+<code>@Before(...)</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Business logic</td>
+<td>your code</td>
+<td>normal method call</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>TenantContextFilter</code> finally</td>
+<td>same as step 3</td>
+<td><code>finally { TenantContext.clear(); }</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-the-order-is-guaranteed">Why the Order Is Guaranteed</h3>
+<p>The order is a <strong>natural consequence</strong> of which system
+each component lives in:</p>
+<pre><code>System 1 — Servlet Filters (Tomcat level)        → runs FIRST
+  HttpSessionSecurityContextRepository
+  SecurityFilterChain
+  TenantContextFilter
+
+System 2 — MVC Interceptors (Spring MVC level)   → runs SECOND
+  TenantScopeInterceptor
+
+System 3 — AOP (method invocation level)         → runs THIRD
+  @PreAuthorize
+  TenantFilterAspect</code></pre>
+<p>Tomcat processes filters before handing the request to Spring. Spring
+runs interceptors before calling the controller. AOP fires at the moment
+specific methods are invoked inside the controller/service.</p>
+<p><strong>You never write “run step 3 after step 2”</strong> — the
+order falls out naturally from which system each class belongs to.</p>
+<hr />
+<p><em>Generated from the RKE project codebase — October 2026</em></p>
+</body>
+</html>

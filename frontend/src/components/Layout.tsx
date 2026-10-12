@@ -104,7 +104,7 @@ export default function Layout() {
           <Item to="/sales/cash" label="Cash Sale" />
           <Item to="/sales/credit" label="Credit Sale" />
           <Item to="/payments/payment" label="Payment" />
-          <Item to="/payments/receipt" label="Receipt" />
+          {isAdmin && <Item to="/payments/receipt" label="Receipt" />}
           <Item to="/returns" label="Returns" />
           {hasFeature('cotton_procurement') && <Item to="/cotton" label="Cotton" />}
           <Item to="/reports" label="Reports" />
